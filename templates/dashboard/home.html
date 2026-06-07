@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Cards de métricas -->
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="bi bi-inbox"></i>
+                </div>
+                <div>
+                    <div class="stat-value">{{ mensagens_recebidas }}</div>
+                    <div class="stat-label">Mensagens Recebidas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-send"></i>
+                </div>
+                <div>
+                    <div class="stat-value">{{ mensagens_enviadas }}</div>
+                    <div class="stat-label">Mensagens Enviadas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-chat-dots"></i>
+                </div>
+                <div>
+                    <div class="stat-value">{{ respostas_ativas }}/{{ total_respostas }}</div>
+                    <div class="stat-label">Respostas Ativas</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card stat-card">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="stat-icon bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-whatsapp"></i>
+                </div>
+                <div>
+                    {% if connection %}
+                    <div class="stat-value status-{{ connection.status }}" style="font-size:1.1rem">
+                        {{ connection.get_status_display }}
+                    </div>
+                    {% else %}
+                    <div class="stat-value text-danger" style="font-size:1.1rem">Desconectado</div>
+                    {% endif %}
+                    <div class="stat-label">Status WhatsApp</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Plano e Assinatura -->
+    <div class="col-lg-4">
+        <div class="card table-card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-gem"></i> Minha Assinatura</h5>
+            </div>
+            <div class="card-body">
+                {% if subscription %}
+                <div class="mb-3">
+                    <span class="text-muted">Plano atual</span>
+                    <h4 class="text-primary">{{ subscription.plan.nome }}</h4>
+                </div>
+                <div class="mb-3">
+                    <span class="text-muted">Vencimento</span>
+                    <p class="mb-0 fw-semibold">{{ subscription.data_vencimento|date:"d/m/Y" }}</p>
+                    <small class="text-muted">{{ subscription.dias_restantes }} dias restantes</small>
+                </div>
+                <div>
+                    <span class="text-muted">Situação</span>
+                    <p>
+                        {% if subscription.esta_ativa %}
+                        <span class="badge bg-success">Ativo</span>
+                        {% elif subscription.esta_vencida %}
+                        <span class="badge bg-danger">Vencido</span>
+                        {% else %}
+                        <span class="badge bg-warning">{{ subscription.get_status_display }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                {% else %}
+                <p class="text-muted">Nenhuma assinatura encontrada.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ações rápidas -->
+    <div class="col-lg-4">
+        <div class="card table-card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Ações Rápidas</h5>
+            </div>
+            <div class="card-body d-grid gap-2">
+                <a href="{% url 'whatsapp:connection' %}" class="btn btn-whatsapp">
+                    <i class="bi bi-whatsapp"></i> Conectar WhatsApp
+                </a>
+                <a href="{% url 'autorespostas:create' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Nova Resposta Automática
+                </a>
+                <a href="{% url 'autorespostas:boas_vindas' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-hand-wave"></i> Configurar Boas-Vindas
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mensagens recentes -->
+    <div class="col-lg-4">
+        <div class="card table-card h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Atividade Recente</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if mensagens_recentes %}
+                <div class="list-group list-group-flush">
+                    {% for msg in mensagens_recentes %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <small>
+                                {% if msg.direcao == 'recebida' %}
+                                <i class="bi bi-arrow-down-left text-success"></i>
+                                {% else %}
+                                <i class="bi bi-arrow-up-right text-primary"></i>
+                                {% endif %}
+                                {{ msg.conteudo|truncatechars:40 }}
+                            </small>
+                            <small class="text-muted">{{ msg.criado_em|timesince }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4 mb-0">Nenhuma mensagem ainda.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

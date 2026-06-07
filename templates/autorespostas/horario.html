@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Horário de Atendimento{% endblock %}
+{% block page_title %}Horário de Atendimento{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card table-card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock"></i> Horário de Atendimento</h5>
+            </div>
+            <div class="card-body p-4">
+                <p class="text-muted">Fora do horário configurado, uma mensagem automática será enviada aos contatos.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="form-check form-switch mb-3">
+                        {{ form.ativo }}
+                        <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativar controle de horário</label>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.hora_inicial.label }}</label>
+                            {{ form.hora_inicial }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.hora_final.label }}</label>
+                            {{ form.hora_final }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.mensagem_fora_horario.label }}</label>
+                        {{ form.mensagem_fora_horario }}
+                    </div>
+                    <button type="submit" class="btn btn-whatsapp">Salvar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Respostas Automáticas{% endblock %}
+{% block page_title %}Respostas Automáticas{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <span class="text-muted">{{ total }} resposta(s)</span>
+        {% if plan and not plan.respostas_ilimitadas %}
+        <span class="badge bg-secondary">Limite: {{ plan.max_respostas }}</span>
+        {% endif %}
+    </div>
+    <a href="{% url 'autorespostas:create' %}" class="btn btn-whatsapp">
+        <i class="bi bi-plus-circle"></i> Nova Resposta
+    </a>
+</div>
+
+<div class="card table-card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Palavra-chave</th>
+                    <th>Resposta</th>
+                    <th>Status</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resposta in respostas %}
+                <tr>
+                    <td><span class="badge bg-light text-dark">{{ resposta.palavra_chave }}</span></td>
+                    <td>{{ resposta.resposta|truncatechars:60 }}</td>
+                    <td>
+                        {% if resposta.status == 'ativa' %}
+                        <span class="badge bg-success">Ativa</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Inativa</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'autorespostas:edit' resposta.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'autorespostas:delete' resposta.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">
+                        Nenhuma resposta automática cadastrada.
+                        <a href="{% url 'autorespostas:create' %}">Criar a primeira</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
