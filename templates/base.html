@@ -1,0 +1,167 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ZapPro{% endblock %} - Autoresposta WhatsApp</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <div class="d-flex" id="wrapper">
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <i class="bi bi-whatsapp"></i>
+                <span>ZapPro</span>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{% url 'dashboard:home' %}" class="nav-link {% if request.resolver_match.app_name == 'dashboard' and request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+                <a href="{% url 'whatsapp:connection' %}" class="nav-link {% if request.resolver_match.app_name == 'whatsapp' %}active{% endif %}">
+                    <i class="bi bi-phone"></i> WhatsApp
+                </a>
+                <a href="{% url 'autorespostas:list' %}" class="nav-link {% if request.resolver_match.app_name == 'autorespostas' and request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' %}active{% endif %}">
+                    <i class="bi bi-chat-dots"></i> Respostas
+                </a>
+                <a href="{% url 'autorespostas:boas_vindas' %}" class="nav-link {% if request.resolver_match.url_name == 'boas_vindas' %}active{% endif %}">
+                    <i class="bi bi-hand-wave"></i> Boas-Vindas
+                </a>
+                <a href="{% url 'autorespostas:horario' %}" class="nav-link {% if request.resolver_match.url_name == 'horario' %}active{% endif %}">
+                    <i class="bi bi-clock"></i> Horário
+                </a>
+                <a href="{% url 'reports:user' %}" class="nav-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">
+                    <i class="bi bi-bar-chart"></i> Relatórios
+                </a>
+                <a href="{% url 'subscriptions:plans' %}" class="nav-link {% if request.resolver_match.url_name == 'plans' %}active{% endif %}">
+                    <i class="bi bi-gem"></i> Planos
+                </a>
+                <a href="{% url 'dashboard:ajuda' %}" class="nav-link {% if request.resolver_match.url_name == 'ajuda' %}active{% endif %}">
+                    <i class="bi bi-question-circle"></i> Ajuda
+                </a>
+                <hr class="sidebar-divider">
+                <a href="{% url 'accounts:profile' %}" class="nav-link">
+                    <i class="bi bi-person"></i> Perfil
+                </a>
+                {% if admin_whatsapp_url %}
+                <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Preciso%20de%20suporte%20no%20ZapPro."
+                   target="_blank" rel="noopener" class="nav-link nav-link-support">
+                    <i class="bi bi-whatsapp"></i> Suporte
+                </a>
+                {% endif %}
+                {% if user.is_staff %}
+                <a href="{% url 'subscriptions:admin_users' %}" class="nav-link">
+                    <i class="bi bi-people"></i> Admin Usuários
+                </a>
+                <a href="{% url 'reports:admin' %}" class="nav-link">
+                    <i class="bi bi-graph-up"></i> Admin Relatórios
+                </a>
+                <a href="/admin/" class="nav-link" target="_blank">
+                    <i class="bi bi-gear"></i> Django Admin
+                </a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="bi bi-person-circle"></i>
+                    <span>{{ user.get_full_name|default:user.username }}</span>
+                </div>
+                <a href="{% url 'accounts:logout' %}" class="btn btn-outline-light btn-sm w-100 mt-2">
+                    <i class="bi bi-box-arrow-left"></i> Sair
+                </a>
+            </div>
+        </div>
+
+        <div class="main-content flex-grow-1">
+            <nav class="topbar d-flex align-items-center justify-content-between px-4">
+                <button class="btn btn-link d-lg-none" id="sidebarToggle" aria-label="Abrir menu">
+                    <i class="bi bi-list fs-4"></i>
+                </button>
+                <div class="d-none d-lg-block">
+                    <h5 class="mb-0 text-muted">{% block page_title %}Dashboard{% endblock %}</h5>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    {% if user_subscription %}
+                    <span class="badge bg-primary">{{ user_plan.nome }}</span>
+                    {% if not subscription_active %}
+                    <span class="badge bg-danger">Vencido</span>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </nav>
+            <div class="content-area p-4">
+    {% else %}
+    <nav class="public-nav navbar navbar-expand-lg navbar-light">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'dashboard:landing' %}">
+                <i class="bi bi-whatsapp"></i> ZapPro
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav" aria-label="Menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="publicNav">
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'dashboard:landing' %}#como-funciona">Como funciona</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'subscriptions:plans' %}">Planos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'dashboard:ajuda' %}">Ajuda</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'accounts:login' %}">Entrar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-whatsapp btn-sm px-3" href="{% url 'accounts:register' %}">Começar grátis</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="guest-main">
+    {% endif %}
+
+                {% if messages %}
+                {% if not user.is_authenticated %}<div class="container pt-3">{% endif %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.level_tag }} alert-dismissible fade show" role="alert">
+                    {% if 'html' in message.extra_tags %}{{ message|safe }}{% else %}{{ message }}{% endif %}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endfor %}
+                {% if not user.is_authenticated %}</div>{% endif %}
+                {% endif %}
+
+                {% block auth_content %}
+                {% block content %}{% endblock %}
+                {% endblock %}
+
+    {% if user.is_authenticated %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    </div>
+    {% endif %}
+
+    {% if admin_whatsapp_url %}
+    <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20ZapPro."
+       class="whatsapp-float" target="_blank" rel="noopener"
+       aria-label="Falar com suporte no WhatsApp"
+       title="Suporte {{ admin_whatsapp_display }}">
+        <i class="bi bi-whatsapp"></i>
+        <span class="whatsapp-float-label d-none d-md-inline">Suporte</span>
+    </a>
+    {% endif %}
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{% static 'js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

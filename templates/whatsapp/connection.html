@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}WhatsApp{% endblock %}
+{% block page_title %}Conexão WhatsApp{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card table-card">
+            <div class="card-body p-4 text-center">
+                <!-- Status -->
+                <div class="mb-4" id="statusArea">
+                    {% if connection.status == 'conectado' %}
+                    <i class="bi bi-check-circle-fill text-success" style="font-size:4rem"></i>
+                    <h4 class="mt-3 status-conectado">Conectado</h4>
+                    {% if connection.numero_telefone %}
+                    <p class="text-muted">{{ connection.numero_telefone }}</p>
+                    {% endif %}
+                    {% elif connection.status == 'aguardando_qr' %}
+                    <i class="bi bi-qr-code text-warning" style="font-size:4rem"></i>
+                    <h4 class="mt-3 status-aguardando_qr">Aguardando QR Code</h4>
+                    <p class="text-muted">Escaneie o código abaixo com seu WhatsApp</p>
+                    {% else %}
+                    <i class="bi bi-whatsapp text-muted" style="font-size:4rem"></i>
+                    <h4 class="mt-3 status-desconectado">Desconectado</h4>
+                    <p class="text-muted">Conecte seu WhatsApp para começar</p>
+                    {% endif %}
+                </div>
+
+                <!-- QR Code -->
+                <div class="qr-container mb-4" id="qrArea" {% if connection.status != 'aguardando_qr' or not connection.qr_code %}style="display:none"{% endif %}>
+                    {% if connection.qr_code %}
+                    <img src="{{ connection.qr_code }}" alt="QR Code WhatsApp" id="qrImage">
+                    {% else %}
+                    <img src="" alt="QR Code WhatsApp" id="qrImage">
+                    {% endif %}
+                    <p class="text-muted mt-3 small">
+                        Abra o WhatsApp > Dispositivos conectados > Conectar dispositivo
+                    </p>
+                </div>
+
+                <!-- Botões -->
+                <div class="d-grid gap-2">
+                    {% if connection.status == 'conectado' %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="disconnect">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="bi bi-x-circle"></i> Desconectar
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="connect">
+                        <button type="submit" class="btn btn-whatsapp w-100" id="btnConnect">
+                            <i class="bi bi-whatsapp"></i> Conectar WhatsApp
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info mt-3">
+            <i class="bi bi-info-circle"></i>
+            Cada usuário possui sua própria sessão WhatsApp isolada.
+            Suas respostas automáticas serão ativadas após a conexão.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const statusUrl = '{% url "whatsapp:status" %}';
+    const statusArea = document.getElementById('statusArea');
+    const qrArea = document.getElementById('qrArea');
+    const qrImage = document.getElementById('qrImage');
+
+    const statusLabels = {
+        'conectado': { icon: 'check-circle-fill', color: 'success', text: 'Conectado' },
+        'desconectado': { icon: 'whatsapp', color: 'muted', text: 'Desconectado' },
+        'aguardando_qr': { icon: 'qr-code', color: 'warning', text: 'Aguardando QR Code' },
+        'conectando': { icon: 'arrow-repeat', color: 'info', text: 'Conectando...' },
+    };
+
+    startWhatsAppPolling(statusUrl, function (data) {
+        const info = statusLabels[data.status] || statusLabels['desconectado'];
+
+        statusArea.innerHTML =
+            '<i class="bi bi-' + info.icon + ' text-' + info.color + '" style="font-size:4rem"></i>' +
+            '<h4 class="mt-3"> ' + info.text + '</h4>' +
+            (data.phone ? '<p class="text-muted">' + data.phone + '</p>' : '');
+
+        if (data.status === 'aguardando_qr' && data.qr_code) {
+            qrArea.style.display = 'block';
+            qrImage.src = data.qr_code;
+        } else if (data.status === 'conectado') {
+            qrArea.style.display = 'none';
+            location.reload();
+        }
+    });
+});
+</script>
+{% endblock %}

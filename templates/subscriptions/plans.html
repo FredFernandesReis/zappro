@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Planos{% endblock %}
+{% block page_title %}Planos{% endblock %}
+{% block content %}
+<div class="{% if not user.is_authenticated %}container py-5{% endif %}">
+{% if not user.is_authenticated %}
+<div class="text-center mb-5">
+    <h1 class="display-6 mb-2">Planos ZapPro</h1>
+    <p class="text-muted mb-0">Escolha o plano e assine pelo WhatsApp com o administrador.</p>
+</div>
+{% endif %}
+<div class="row g-4">
+    {% for plano in planos %}
+    <div class="col-md-4">
+        <div class="card plan-card {% if subscription and subscription.plan.id == plano.id %}featured{% endif %}">
+            <div class="card-body p-4 text-center d-flex flex-column">
+                {% if subscription and subscription.plan.id == plano.id %}
+                <span class="badge bg-primary mb-2">Plano Atual</span>
+                {% endif %}
+                <h4>{{ plano.nome }}</h4>
+                <div class="plan-price my-3">
+                    {% if plano.preco_mensal == 0 %}
+                    Grátis
+                    {% else %}
+                    R$ {{ plano.preco_mensal }}<small class="text-muted">/mês</small>
+                    {% endif %}
+                </div>
+                <p class="text-muted small">{{ plano.descricao }}</p>
+                <ul class="list-unstyled text-start mt-3 mb-4">
+                    <li><i class="bi bi-check text-success"></i> {{ plano.max_whatsapp }} WhatsApp</li>
+                    <li>
+                        <i class="bi bi-check text-success"></i>
+                        {% if plano.respostas_ilimitadas %}Respostas ilimitadas{% else %}Até {{ plano.max_respostas }} respostas{% endif %}
+                    </li>
+                    {% if plano.permite_horario %}
+                    <li><i class="bi bi-check text-success"></i> Horário de atendimento</li>
+                    {% endif %}
+                    {% if plano.permite_boas_vindas %}
+                    <li><i class="bi bi-check text-success"></i> Mensagem de boas-vindas</li>
+                    {% endif %}
+                </ul>
+                <div class="mt-auto">
+                    {% if plano.preco_mensal == 0 %}
+                    {% if subscription and subscription.plan.id == plano.id %}
+                    <span class="badge bg-success">Seu plano atual</span>
+                    {% else %}
+                    <span class="text-muted small">Plano padrão ao criar conta</span>
+                    {% endif %}
+                    {% elif subscription and subscription.plan.id == plano.id %}
+                    <span class="badge bg-success">Seu plano atual</span>
+                    {% else %}
+                    <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Quero%20assinar%20o%20plano%20{{ plano.nome|urlencode }}%20no%20ZapPro."
+                       target="_blank" rel="noopener" class="btn btn-whatsapp w-100">
+                        <i class="bi bi-whatsapp"></i> Assinar {{ plano.nome }}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card table-card mt-4">
+    <div class="card-body p-4 d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
+        <div>
+            <h5 class="mb-1"><i class="bi bi-headset"></i> Quer assinar ou trocar de plano?</h5>
+            <p class="text-muted mb-0">
+                Fale com o administrador pelo WhatsApp:
+                <strong>{{ admin_whatsapp_display }}</strong>
+            </p>
+        </div>
+        <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Tenho%20interesse%20em%20assinar%20um%20plano%20no%20ZapPro."
+           target="_blank" rel="noopener" class="btn btn-whatsapp btn-lg flex-shrink-0">
+            <i class="bi bi-whatsapp"></i> Chamar no WhatsApp
+        </a>
+    </div>
+</div>
+{% if not user.is_authenticated %}
+<div class="text-center mt-4">
+    <a href="{% url 'accounts:register' %}" class="btn btn-outline-success">Criar conta grátis</a>
+</div>
+{% endif %}
+</div>
+{% endblock %}

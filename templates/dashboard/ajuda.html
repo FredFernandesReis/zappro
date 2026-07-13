@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Ajuda{% endblock %}
+{% block page_title %}Ajuda{% endblock %}
+
+{% block content %}
+<div class="{% if not user.is_authenticated %}container py-5{% endif %}">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="mb-4 {% if not user.is_authenticated %}text-center{% endif %}">
+                <h1 class="{% if user.is_authenticated %}h3{% else %}display-6{% endif %} mb-2">Central de Ajuda</h1>
+                <p class="text-muted mb-0">Respostas rápidas para usar o ZapPro com segurança e sem complicação.</p>
+            </div>
+
+            <div class="accordion ajuda-accordion" id="faqAccordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                            O que é o ZapPro?
+                        </button>
+                    </h2>
+                    <div id="faq1" class="accordion-collapse collapse show" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            É um sistema para conectar seu WhatsApp e configurar respostas automáticas por palavra-chave,
+                            mensagem de boas-vindas e horário de atendimento.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                            Como conectar o WhatsApp?
+                        </button>
+                    </h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            No painel, abra <strong>WhatsApp</strong>, clique em conectar e escaneie o QR Code pelo celular:
+                            WhatsApp → Dispositivos conectados → Conectar dispositivo.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                            Como criar uma resposta automática?
+                        </button>
+                    </h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Em <strong>Respostas</strong>, crie uma palavra-chave (ex.: preço, horário) e a mensagem que
+                            o sistema deve enviar quando o cliente digitar essa palavra.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                            O que é a mensagem de boas-vindas?
+                        </button>
+                    </h2>
+                    <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            É a primeira mensagem enviada automaticamente quando um contato novo fala com você.
+                            Disponível conforme o plano contratado.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                            Como funciona o horário de atendimento?
+                        </button>
+                    </h2>
+                    <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Você define o período em que está disponível. Fora desse horário, o ZapPro pode enviar
+                            uma mensagem avisando o cliente. Recurso disponível a partir do plano Básico.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                            Como assinar ou trocar de plano?
+                        </button>
+                    </h2>
+                    <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            A assinatura é feita pelo WhatsApp com o administrador.
+                            Veja os planos e chame no número
+                            <strong>{{ admin_whatsapp_display }}</strong>.
+                            {% if admin_whatsapp_url %}
+                            <div class="mt-3">
+                                <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Quero%20assinar%20um%20plano%20no%20ZapPro."
+                                   target="_blank" rel="noopener" class="btn btn-whatsapp btn-sm">
+                                    <i class="bi bi-whatsapp"></i> Chamar para assinar
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq7">
+                            Preciso de suporte. O que faço?
+                        </button>
+                    </h2>
+                    <div id="faq7" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Use o botão verde de WhatsApp na tela ou chame
+                            <strong>{{ admin_whatsapp_display }}</strong>.
+                            {% if admin_whatsapp_url %}
+                            <div class="mt-3">
+                                <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Preciso%20de%20suporte%20no%20ZapPro."
+                                   target="_blank" rel="noopener" class="btn btn-whatsapp btn-sm">
+                                    <i class="bi bi-whatsapp"></i> Abrir suporte
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if not user.is_authenticated %}
+            <div class="text-center mt-5">
+                <a href="{% url 'accounts:register' %}" class="btn btn-whatsapp me-2">Criar conta grátis</a>
+                <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary">Ver planos</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

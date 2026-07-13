@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Renovar Assinatura{% endblock %}
+{% block page_title %}Renovar Assinatura{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card table-card border-danger">
+            <div class="card-body p-4 text-center">
+                <i class="bi bi-exclamation-triangle text-danger" style="font-size:3rem"></i>
+                <h3 class="mt-3">Assinatura Inativa</h3>
+                {% if subscription %}
+                {% if subscription.esta_vencida %}
+                <p class="text-muted">Sua assinatura venceu em {{ subscription.data_vencimento|date:"d/m/Y" }}.</p>
+                {% else %}
+                <p class="text-muted">Sua assinatura está {{ subscription.get_status_display|lower }}.</p>
+                {% endif %}
+                <p>Plano: <strong>{{ subscription.plan.nome }}</strong></p>
+                {% endif %}
+                <p>Renove sua assinatura para continuar usando o ZapPro.</p>
+
+                <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Preciso%20renovar%20minha%20assinatura%20no%20ZapPro."
+                   target="_blank" rel="noopener" class="btn btn-whatsapp btn-lg">
+                    <i class="bi bi-whatsapp"></i> Chamar Administrador
+                </a>
+
+                <p class="text-muted mt-3 mb-1">
+                    WhatsApp do administrador:
+                </p>
+                <p class="fw-semibold mb-3">{{ admin_whatsapp_display }}</p>
+
+                <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary">
+                    Ver Planos
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

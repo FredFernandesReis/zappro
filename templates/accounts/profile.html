@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil{% endblock %}
+{% block page_title %}Meu Perfil{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card table-card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-person"></i> Dados do Perfil</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.first_name.label }}</label>
+                            {{ form.first_name }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.last_name.label }}</label>
+                            {{ form.last_name }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.email.label }}</label>
+                        {{ form.email }}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.telefone.label }}</label>
+                            {{ form.telefone }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.empresa.label }}</label>
+                            {{ form.empresa }}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-whatsapp">Salvar Alterações</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card table-card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-shield-lock"></i> Segurança</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Altere sua senha de acesso ao sistema.</p>
+                <a href="{% url 'accounts:password_change' %}" class="btn btn-outline-primary w-100">
+                    Alterar Senha
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
