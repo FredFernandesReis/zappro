@@ -3,6 +3,8 @@ Lógica de processamento de mensagens recebidas e envio de autorespostas.
 """
 
 import logging
+import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
@@ -51,7 +53,10 @@ class MessageHandler:
         return None
 
     def _precisa_boas_vindas(self, telefone):
-        """Verifica se o contato ainda não recebeu boas-vindas."""
+        """
+        Boas-vindas para contato novo ou que ficou sem falar
+        pelo intervalo configurado (padrão: 20 minutos).
+        """
         if not plan_allows_boas_vindas(self.plan):
             return False, None
 
@@ -63,10 +68,35 @@ class MessageHandler:
         if not config.ativo:
             return False, None
 
-        if ContatoAtendido.objects.filter(user=self.user, telefone=telefone).exists():
-            return False, None
+        intervalo = int(getattr(settings, "BOAS_VINDAS_INTERVALO_MINUTOS", 20))
+        contato = ContatoAtendido.objects.filter(user=self.user, telefone=telefone).first()
+        if contato:
+            decorrido = timezone.now() - contato.primeira_mensagem_em
+            if decorrido < timedelta(minutes=max(intervalo, 1)):
+                return False, None
+            # Passou o intervalo: permite boas-vindas de novo
+            contato.delete()
 
         return True, config.mensagem
+
+    def _delay_humano(self):
+        """Atraso aleatório para parecer resposta humana."""
+        base = int(getattr(settings, "AUTORESPOSTA_DELAY_SEGUNDOS", 4))
+        variacao = int(getattr(settings, "AUTORESPOSTA_DELAY_VARIACAO_SEGUNDOS", 2))
+        base = max(base, 1)
+        variacao = max(variacao, 0)
+        return base + random.randint(0, variacao)
+
+    def _registrar_boas_vindas(self, telefone):
+        ContatoAtendido.objects.update_or_create(
+            user=self.user,
+            telefone=telefone,
+            defaults={},
+        )
+        # Garante timestamp atual (auto_now_add não atualiza sozinho)
+        ContatoAtendido.objects.filter(user=self.user, telefone=telefone).update(
+            primeira_mensagem_em=timezone.now()
+        )
 
     def process_incoming_message(self, telefone, conteudo, contato_nome="", jid=None):
         """
@@ -77,7 +107,6 @@ class MessageHandler:
             logger.info("Assinatura inativa — mensagem ignorada (user %s)", self.user.id)
             return None
 
-        # Registra mensagem recebida
         Mensagem.objects.create(
             user=self.user,
             direcao="recebida",
@@ -89,7 +118,6 @@ class MessageHandler:
         resposta_texto = None
         tipo_resposta = ""
 
-        # Verifica horário de atendimento
         if not self._esta_no_horario():
             try:
                 config_horario = self.user.config_horario
@@ -98,24 +126,20 @@ class MessageHandler:
             except ConfiguracaoHorario.DoesNotExist:
                 pass
 
-        # Verifica boas-vindas para novos contatos
         if not resposta_texto:
             precisa, mensagem_bv = self._precisa_boas_vindas(telefone)
             if precisa:
                 resposta_texto = mensagem_bv
                 tipo_resposta = "boas_vindas"
-                ContatoAtendido.objects.create(user=self.user, telefone=telefone)
 
-        # Busca resposta por palavra-chave
         if not resposta_texto:
             resposta_palavra = self._buscar_resposta_palavra_chave(conteudo)
             if resposta_palavra:
                 resposta_texto = resposta_palavra
                 tipo_resposta = "palavra_chave"
 
-        # Envia resposta se encontrada
         if resposta_texto:
-            delay = getattr(settings, "AUTORESPOSTA_DELAY_SEGUNDOS", 2)
+            delay = self._delay_humano()
             show_typing = getattr(settings, "AUTORESPOSTA_MOSTRAR_DIGITANDO", True)
 
             result = self.whatsapp_service.send_message(
@@ -127,8 +151,10 @@ class MessageHandler:
                 show_typing=show_typing,
             )
 
-            # Só registra no painel se o WhatsApp confirmou o envio de verdade
             if result.get("success") and result.get("messageId"):
+                if tipo_resposta == "boas_vindas":
+                    self._registrar_boas_vindas(telefone)
+
                 Mensagem.objects.create(
                     user=self.user,
                     direcao="enviada",
@@ -137,8 +163,12 @@ class MessageHandler:
                     tipo_resposta=tipo_resposta,
                 )
                 logger.info(
-                    "Autoresposta (%s) enviada para %s (user %s, id %s)",
-                    tipo_resposta, telefone, self.user.id, result.get("messageId"),
+                    "Autoresposta (%s) enviada para %s (user %s, id %s, delay %ss)",
+                    tipo_resposta,
+                    telefone,
+                    self.user.id,
+                    result.get("messageId"),
+                    delay,
                 )
             else:
                 logger.error(

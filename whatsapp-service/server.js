@@ -384,7 +384,14 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
 });
 
 app.post('/send', authMiddleware, async (req, res) => {
-    const { userId, phone, jid, message, delaySeconds = 0 } = req.body;
+    const {
+        userId,
+        phone,
+        jid,
+        message,
+        delaySeconds = 0,
+        showTyping = false,
+    } = req.body;
 
     if (!userId || !message || (!phone && !jid)) {
         return res.status(400).json({ success: false, error: 'Parâmetros incompletos' });
@@ -404,13 +411,33 @@ app.post('/send', authMiddleware, async (req, res) => {
             });
         }
 
-        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 10) * 1000;
-        if (delayMs > 0) await sleep(delayMs);
-
+        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 20) * 1000;
         let lastError = null;
 
         for (const targetJid of candidates) {
             try {
+                // Digitando no mesmo JID que vai receber a mensagem
+                if (showTyping) {
+                    try {
+                        await session.sock.presenceSubscribe(targetJid);
+                        await session.sock.sendPresenceUpdate('composing', targetJid);
+                    } catch (presenceErr) {
+                        console.warn('Presença digitando ignorada:', presenceErr.message);
+                    }
+                }
+
+                if (delayMs > 0) {
+                    await sleep(delayMs);
+                }
+
+                if (showTyping) {
+                    try {
+                        await session.sock.sendPresenceUpdate('paused', targetJid);
+                    } catch (_) {
+                        // ignore
+                    }
+                }
+
                 const sent = await session.sock.sendMessage(targetJid, {
                     text: String(message),
                 });
@@ -420,7 +447,9 @@ app.post('/send', authMiddleware, async (req, res) => {
                 }
 
                 rememberOutgoingMessage(userId, sent);
-                console.log(`OK envio user=${userId} jid=${targetJid} id=${messageId}`);
+                console.log(
+                    `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${delayMs}ms typing=${!!showTyping}`
+                );
                 return res.json({ success: true, jid: targetJid, messageId });
             } catch (err) {
                 lastError = err;
