@@ -11,7 +11,6 @@ module.exports = {
       max_memory_restart: "500M",
       env: {
         PORT: 3001,
-        // DEVE ser igual a WHATSAPP_SERVICE_SECRET no Django
         API_SECRET: "um-segredo-forte",
         DJANGO_WEBHOOK_URL: "http://127.0.0.1:8000/whatsapp/webhook/",
       },
