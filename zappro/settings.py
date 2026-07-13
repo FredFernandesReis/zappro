@@ -120,8 +120,8 @@ WHATSAPP_SERVICE_SECRET = os.environ.get("WHATSAPP_SERVICE_SECRET", "um-segredo-
 WHATSAPP_SESSIONS_DIR = BASE_DIR / "sessoes"
 
 # Autoresposta — atraso e "digitando..." (fixo, leve, anti-bloqueio)
-AUTORESPOSTA_DELAY_SEGUNDOS = 2
-AUTORESPOSTA_MOSTRAR_DIGITANDO = True
+AUTORESPOSTA_DELAY_SEGUNDOS = 1
+AUTORESPOSTA_MOSTRAR_DIGITANDO = False
 
 # Contato do administrador para assinaturas
 ADMIN_WHATSAPP = "5531986427264"
