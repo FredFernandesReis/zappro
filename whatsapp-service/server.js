@@ -344,36 +344,36 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
 });
 
 /**
- * Resolve o melhor JID para entrega (número real > @s.whatsapp.net > @lid)
+ * Monta candidatos de destino.
+ * Prioriza o JID da conversa recebida (@lid / @s.whatsapp.net) —
+ * enviar primeiro ao número resolvido fazia "digitando" no chat certo
+ * e a mensagem ir para outro endereço.
  */
 async function resolveTargetJid(sock, phone, jid) {
-    const cleanPhone = String(phone || '')
-        .replace(/\D/g, '')
-        .replace(/^0+/, '');
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
     const candidates = [];
 
     if (jid && String(jid).includes('@')) {
-        candidates.push(String(jid));
+        candidates.push(String(jid).trim());
     }
 
     if (cleanPhone && cleanPhone.length >= 10 && cleanPhone.length <= 15) {
+        candidates.push(`${cleanPhone}@s.whatsapp.net`);
         try {
             const results = await sock.onWhatsApp(cleanPhone);
             if (results?.[0]?.exists && results[0].jid) {
-                candidates.unshift(results[0].jid);
+                candidates.push(results[0].jid);
             }
         } catch (err) {
             console.warn('onWhatsApp falhou:', err.message);
         }
-        candidates.push(`${cleanPhone}@s.whatsapp.net`);
     }
 
-    // Remove duplicados mantendo ordem
     return [...new Set(candidates.filter(Boolean))];
 }
 
 /**
- * POST /send - Envia mensagem (com atraso e indicador digitando opcionais)
+ * POST /send - Envia mensagem
  */
 app.post('/send', authMiddleware, async (req, res) => {
     const { userId, phone, jid, message, delaySeconds = 0, showTyping = false } = req.body;
@@ -383,7 +383,7 @@ app.post('/send', authMiddleware, async (req, res) => {
     }
 
     const session = sessions[userId];
-    if (!session || session.status !== 'conectado') {
+    if (!session || session.status !== 'conectado' || !session.sock) {
         return res.status(400).json({ success: false, error: 'WhatsApp não conectado' });
     }
 
@@ -396,37 +396,41 @@ app.post('/send', authMiddleware, async (req, res) => {
             });
         }
 
-        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 60) * 1000;
+        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 15) * 1000;
+        if (delayMs > 0) {
+            await sleep(delayMs);
+        }
+
         let lastError = null;
 
         for (const targetJid of candidates) {
             try {
-                if (showTyping && delayMs > 0) {
+                // Digitando só no JID que vamos usar, e só se pedido
+                if (showTyping) {
                     try {
-                        await session.sock.presenceSubscribe(targetJid);
                         await session.sock.sendPresenceUpdate('composing', targetJid);
-                    } catch (presenceErr) {
-                        console.warn('Aviso ao enviar presença digitando:', presenceErr.message);
-                    }
-                    await sleep(delayMs);
-                    try {
+                        await sleep(600);
                         await session.sock.sendPresenceUpdate('paused', targetJid);
                     } catch (presenceErr) {
-                        console.warn('Aviso ao pausar presença:', presenceErr.message);
+                        console.warn('Presença ignorada:', presenceErr.message);
                     }
-                } else if (delayMs > 0) {
-                    await sleep(delayMs);
                 }
 
-                const sent = await session.sock.sendMessage(targetJid, { text: message });
-                if (!sent?.key?.id) {
+                const sent = await session.sock.sendMessage(targetJid, { text: String(message) });
+                const messageId = sent?.key?.id;
+                if (!messageId) {
                     throw new Error('WhatsApp não confirmou o envio da mensagem');
                 }
 
+                // fromMe deve ser true no retorno de mensagem enviada por nós
                 console.log(
-                    `Mensagem enviada para ${targetJid} (user ${userId}, id ${sent.key.id}, atraso ${delayMs}ms)`
+                    `OK envio user=${userId} jid=${targetJid} id=${messageId} fromMe=${sent?.key?.fromMe}`
                 );
-                return res.json({ success: true, jid: targetJid, messageId: sent.key.id });
+                return res.json({
+                    success: true,
+                    jid: targetJid,
+                    messageId,
+                });
             } catch (err) {
                 lastError = err;
                 console.warn(`Falha ao enviar para ${targetJid}: ${err.message}`);
@@ -436,7 +440,7 @@ app.post('/send', authMiddleware, async (req, res) => {
         throw lastError || new Error('Falha ao enviar mensagem');
     } catch (err) {
         console.error('Erro ao enviar:', err);
-        res.status(500).json({ success: false, error: err.message });
+        res.status(500).json({ success: false, error: err.message || String(err) });
     }
 });
 

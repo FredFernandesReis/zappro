@@ -28,8 +28,22 @@ class WhatsAppService:
             response = requests.request(
                 method, url, json=data, headers=self.headers, timeout=timeout
             )
-            response.raise_for_status()
-            return response.json()
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {"success": False, "error": response.text[:200]}
+
+            if response.status_code >= 400:
+                logger.error(
+                    "WhatsApp service %s %s -> %s: %s",
+                    method, endpoint, response.status_code, payload,
+                )
+                return {
+                    "success": False,
+                    "error": payload.get("error") or f"HTTP {response.status_code}",
+                }
+
+            return payload
         except requests.exceptions.ConnectionError:
             logger.error("Serviço WhatsApp indisponível em %s", url)
             return {"success": False, "error": "Serviço WhatsApp indisponível. Verifique se o Node.js está rodando."}
