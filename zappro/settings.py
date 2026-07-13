@@ -9,9 +9,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "django-insecure-217m2hny331p8ynln3c7$hg*eg=24vxwcz%w^&sc_dt(^u5+0s"
 
-DEBUG = True
+# Produção: DEBUG=False esconde páginas de erro detalhadas do público
+DEBUG = False
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    "zappro.sbs",
+    "www.zappro.sbs",
+    "187.124.11.110",
+    "localhost",
+    "127.0.0.1",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://zappro.sbs",
+    "https://www.zappro.sbs",
+    "http://zappro.sbs",
+    "http://www.zappro.sbs",
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
