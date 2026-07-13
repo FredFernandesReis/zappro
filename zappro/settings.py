@@ -4,6 +4,7 @@ Preparado para futura integração com Mercado Pago e WhatsApp API Oficial.
 """
 
 from pathlib import Path
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -113,8 +114,9 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "ZapPro <noreply@zappro.com.br>"
 
 # Serviço WhatsApp (Baileys Node.js)
-WHATSAPP_SERVICE_URL = "http://localhost:3001"
-WHATSAPP_SERVICE_SECRET = "zappro-secret-key-change-in-production"
+# API_SECRET do PM2 (ecosystem.config.cjs) DEVE ser igual a WHATSAPP_SERVICE_SECRET
+WHATSAPP_SERVICE_URL = os.environ.get("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3001")
+WHATSAPP_SERVICE_SECRET = os.environ.get("WHATSAPP_SERVICE_SECRET", "um-segredo-forte")
 WHATSAPP_SESSIONS_DIR = BASE_DIR / "sessoes"
 
 # Autoresposta — atraso e "digitando..." (fixo, leve, anti-bloqueio)

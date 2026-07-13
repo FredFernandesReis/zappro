@@ -21,12 +21,14 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const API_SECRET = process.env.API_SECRET || 'zappro-secret-key-change-in-production';
-const DJANGO_WEBHOOK_URL = process.env.DJANGO_WEBHOOK_URL || 'http://localhost:8000/whatsapp/webhook/';
+const API_SECRET = process.env.API_SECRET || 'um-segredo-forte';
+const DJANGO_WEBHOOK_URL = process.env.DJANGO_WEBHOOK_URL || 'http://127.0.0.1:8000/whatsapp/webhook/';
 const SESSIONS_DIR = path.join(__dirname, '..', 'sessoes');
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // Armazena sockets ativos por userId
 const sessions = {};
+const reconnectAttempts = {};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -57,9 +59,14 @@ async function notifyDjango(data) {
                 'X-API-Secret': API_SECRET,
             },
             timeout: 60000,
+            validateStatus: (status) => status >= 200 && status < 300,
         });
     } catch (err) {
-        console.error('Erro ao notificar Django:', err.message);
+        const status = err.response?.status;
+        const detail = err.response?.data ? JSON.stringify(err.response.data) : '';
+        console.error(
+            `Erro ao notificar Django [${DJANGO_WEBHOOK_URL}] status=${status || 'n/a'}: ${err.message} ${detail}`
+        );
     }
 }
 
@@ -77,11 +84,29 @@ function getSessionPath(userId) {
     return path.join(SESSIONS_DIR, `usuario_${userId}`);
 }
 
+function clearSessionFiles(userId) {
+    const sessionPath = getSessionPath(userId);
+    if (fs.existsSync(sessionPath)) {
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+    }
+}
+
 /**
  * Cria ou reconecta socket WhatsApp para um usuário
  */
 async function createSession(userId) {
     const sessionPath = getSessionPath(userId);
+
+    // Evita múltiplos sockets do mesmo usuário ao mesmo tempo
+    const existing = sessions[userId];
+    if (existing?.sock) {
+        try {
+            existing.sock.ev.removeAllListeners();
+            existing.sock.end?.(undefined);
+        } catch (_) {
+            // ignore
+        }
+    }
 
     if (!fs.existsSync(sessionPath)) {
         fs.mkdirSync(sessionPath, { recursive: true });
@@ -132,6 +157,7 @@ async function createSession(userId) {
         }
 
         if (connection === 'open') {
+            reconnectAttempts[userId] = 0;
             session.status = 'conectado';
             session.qrCode = null;
 
@@ -150,7 +176,10 @@ async function createSession(userId) {
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            const loggedOut = statusCode === DisconnectReason.loggedOut;
+            const replaced = statusCode === DisconnectReason.connectionReplaced;
+            const attempts = reconnectAttempts[userId] || 0;
+            const shouldReconnect = !loggedOut && !replaced && attempts < MAX_RECONNECT_ATTEMPTS;
 
             session.status = 'desconectado';
 
@@ -161,13 +190,20 @@ async function createSession(userId) {
             });
 
             if (shouldReconnect) {
-                console.log(`Reconectando usuário ${userId}...`);
-                setTimeout(() => createSession(userId), 3000);
+                reconnectAttempts[userId] = attempts + 1;
+                const delay = Math.min(3000 * reconnectAttempts[userId], 30000);
+                console.log(
+                    `Reconectando usuário ${userId} (tentativa ${reconnectAttempts[userId]}/${MAX_RECONNECT_ATTEMPTS}) em ${delay}ms...`
+                );
+                setTimeout(() => createSession(userId), delay);
             } else {
+                console.log(
+                    `Sessão do usuário ${userId} encerrada (code=${statusCode}, tentativas=${attempts}).`
+                );
                 delete sessions[userId];
-                // Remove sessão ao deslogar
-                if (fs.existsSync(sessionPath)) {
-                    fs.rmSync(sessionPath, { recursive: true, force: true });
+                delete reconnectAttempts[userId];
+                if (loggedOut || attempts >= MAX_RECONNECT_ATTEMPTS) {
+                    clearSessionFiles(userId);
                 }
             }
         }
@@ -227,6 +263,7 @@ app.post('/connect', authMiddleware, async (req, res) => {
             });
         }
 
+        reconnectAttempts[userId] = 0;
         const session = await createSession(userId);
 
         // Aguarda QR Code por até 10 segundos
@@ -263,11 +300,8 @@ app.post('/disconnect', authMiddleware, async (req, res) => {
             await session.sock.logout();
         }
         delete sessions[userId];
-
-        const sessionPath = getSessionPath(userId);
-        if (fs.existsSync(sessionPath)) {
-            fs.rmSync(sessionPath, { recursive: true, force: true });
-        }
+        delete reconnectAttempts[userId];
+        clearSessionFiles(userId);
 
         await notifyDjango({
             type: 'connection.update',
@@ -357,10 +391,15 @@ app.post('/send', authMiddleware, async (req, res) => {
  * GET /health - Health check
  */
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok', sessions: Object.keys(sessions).length });
+    res.json({
+        status: 'ok',
+        sessions: Object.keys(sessions).length,
+        webhook: DJANGO_WEBHOOK_URL,
+    });
 });
 
 app.listen(PORT, () => {
     console.log(`ZapPro WhatsApp Service rodando na porta ${PORT}`);
+    console.log(`Webhook Django: ${DJANGO_WEBHOOK_URL}`);
     console.log(`Sessões em: ${SESSIONS_DIR}`);
 });
