@@ -127,7 +127,8 @@ class MessageHandler:
                 show_typing=show_typing,
             )
 
-            if result.get("success"):
+            # Só registra no painel se o WhatsApp confirmou o envio de verdade
+            if result.get("success") and result.get("messageId"):
                 Mensagem.objects.create(
                     user=self.user,
                     direcao="enviada",
@@ -136,10 +137,16 @@ class MessageHandler:
                     tipo_resposta=tipo_resposta,
                 )
                 logger.info(
-                    "Autoresposta (%s) enviada para %s (user %s)",
-                    tipo_resposta, telefone, self.user.id,
+                    "Autoresposta (%s) enviada para %s (user %s, id %s)",
+                    tipo_resposta, telefone, self.user.id, result.get("messageId"),
                 )
             else:
-                logger.error("Falha ao enviar autoresposta: %s", result.get("error"))
+                logger.error(
+                    "Falha ao enviar autoresposta para %s (user %s): %s",
+                    telefone,
+                    self.user.id,
+                    result.get("error") or "sem confirmação do WhatsApp",
+                )
+                return None
 
         return resposta_texto

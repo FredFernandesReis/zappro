@@ -224,17 +224,20 @@ async function createSession(userId) {
 
             if (!messageContent) continue;
 
-            // WhatsApp recente usa @lid; senderPn traz o número real quando disponível
-            const senderPn = msg.key.senderPn || '';
-            const phone = senderPn
-                ? senderPn.split('@')[0].split(':')[0]
-                : jid.split('@')[0];
+            // WhatsApp recente usa @lid; prioriza número real (senderPn / remoteJidAlt)
+            const senderPn = msg.key.senderPn || msg.key.remoteJidAlt || '';
+            let phone = '';
+            if (senderPn) {
+                phone = String(senderPn).split('@')[0].split(':')[0].replace(/\D/g, '');
+            } else if (jid.endsWith('@s.whatsapp.net')) {
+                phone = jid.split('@')[0].split(':')[0].replace(/\D/g, '');
+            }
             const pushName = msg.pushName || '';
 
             await notifyDjango({
                 type: 'message.received',
                 userId,
-                from: phone,
+                from: phone || jid.split('@')[0],
                 jid,
                 message: messageContent,
                 pushName,
@@ -341,6 +344,35 @@ app.get('/status/:userId', authMiddleware, (req, res) => {
 });
 
 /**
+ * Resolve o melhor JID para entrega (número real > @s.whatsapp.net > @lid)
+ */
+async function resolveTargetJid(sock, phone, jid) {
+    const cleanPhone = String(phone || '')
+        .replace(/\D/g, '')
+        .replace(/^0+/, '');
+    const candidates = [];
+
+    if (jid && String(jid).includes('@')) {
+        candidates.push(String(jid));
+    }
+
+    if (cleanPhone && cleanPhone.length >= 10 && cleanPhone.length <= 15) {
+        try {
+            const results = await sock.onWhatsApp(cleanPhone);
+            if (results?.[0]?.exists && results[0].jid) {
+                candidates.unshift(results[0].jid);
+            }
+        } catch (err) {
+            console.warn('onWhatsApp falhou:', err.message);
+        }
+        candidates.push(`${cleanPhone}@s.whatsapp.net`);
+    }
+
+    // Remove duplicados mantendo ordem
+    return [...new Set(candidates.filter(Boolean))];
+}
+
+/**
  * POST /send - Envia mensagem (com atraso e indicador digitando opcionais)
  */
 app.post('/send', authMiddleware, async (req, res) => {
@@ -356,31 +388,52 @@ app.post('/send', authMiddleware, async (req, res) => {
     }
 
     try {
-        const targetJid = jid || (phone.includes('@') ? phone : `${phone}@s.whatsapp.net`);
-        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 60) * 1000;
-
-        if (showTyping && delayMs > 0) {
-            try {
-                await session.sock.presenceSubscribe(targetJid);
-                await session.sock.sendPresenceUpdate('composing', targetJid);
-            } catch (presenceErr) {
-                console.warn('Aviso ao enviar presença digitando:', presenceErr.message);
-            }
-            await sleep(delayMs);
-            try {
-                await session.sock.sendPresenceUpdate('paused', targetJid);
-            } catch (presenceErr) {
-                console.warn('Aviso ao pausar presença:', presenceErr.message);
-            }
-        } else if (delayMs > 0) {
-            await sleep(delayMs);
+        const candidates = await resolveTargetJid(session.sock, phone, jid);
+        if (!candidates.length) {
+            return res.status(400).json({
+                success: false,
+                error: 'Não foi possível resolver o destinatário da mensagem',
+            });
         }
 
-        await session.sock.sendMessage(targetJid, { text: message });
-        console.log(
-            `Mensagem enviada para ${targetJid} (user ${userId}, atraso ${delayMs}ms, digitando ${!!showTyping})`
-        );
-        res.json({ success: true });
+        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 60) * 1000;
+        let lastError = null;
+
+        for (const targetJid of candidates) {
+            try {
+                if (showTyping && delayMs > 0) {
+                    try {
+                        await session.sock.presenceSubscribe(targetJid);
+                        await session.sock.sendPresenceUpdate('composing', targetJid);
+                    } catch (presenceErr) {
+                        console.warn('Aviso ao enviar presença digitando:', presenceErr.message);
+                    }
+                    await sleep(delayMs);
+                    try {
+                        await session.sock.sendPresenceUpdate('paused', targetJid);
+                    } catch (presenceErr) {
+                        console.warn('Aviso ao pausar presença:', presenceErr.message);
+                    }
+                } else if (delayMs > 0) {
+                    await sleep(delayMs);
+                }
+
+                const sent = await session.sock.sendMessage(targetJid, { text: message });
+                if (!sent?.key?.id) {
+                    throw new Error('WhatsApp não confirmou o envio da mensagem');
+                }
+
+                console.log(
+                    `Mensagem enviada para ${targetJid} (user ${userId}, id ${sent.key.id}, atraso ${delayMs}ms)`
+                );
+                return res.json({ success: true, jid: targetJid, messageId: sent.key.id });
+            } catch (err) {
+                lastError = err;
+                console.warn(`Falha ao enviar para ${targetJid}: ${err.message}`);
+            }
+        }
+
+        throw lastError || new Error('Falha ao enviar mensagem');
     } catch (err) {
         console.error('Erro ao enviar:', err);
         res.status(500).json({ success: false, error: err.message });
