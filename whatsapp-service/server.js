@@ -26,7 +26,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 const API_SECRET = process.env.API_SECRET || 'um-segredo-forte';
-const DJANGO_WEBHOOK_URL = process.env.DJANGO_WEBHOOK_URL || 'http://127.0.0.1:8000/whatsapp/webhook/';
+const DJANGO_WEBHOOK_URL = process.env.DJANGO_WEBHOOK_URL || 'http://127.0.0.1:8001/whatsapp/webhook/';
 const SESSIONS_DIR = path.join(__dirname, '..', 'sessoes');
 const MAX_RECONNECT_ATTEMPTS = 5;
 
