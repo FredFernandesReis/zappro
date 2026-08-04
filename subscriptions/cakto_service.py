@@ -61,9 +61,28 @@ def extract_customer_email(data: dict) -> str:
         ("client", "email"),
         ("email",),
         ("customerEmail",),
+        ("customer_email",),
+        ("user", "email"),
+        ("data", "customer", "email"),
+        ("data", "email"),
         default="",
     )
-    return str(email or "").strip().lower()
+    if email:
+        return str(email).strip().lower()
+
+    # Varredura rasa por qualquer campo "email"
+    stack = [data]
+    while stack:
+        cur = stack.pop()
+        if isinstance(cur, dict):
+            for k, v in cur.items():
+                if str(k).lower() in ("email", "customer_email", "customeremail") and v:
+                    return str(v).strip().lower()
+                if isinstance(v, (dict, list)):
+                    stack.append(v)
+        elif isinstance(cur, list):
+            stack.extend(cur)
+    return ""
 
 
 def extract_ref_user_id(data: dict) -> int | None:
@@ -109,6 +128,11 @@ def resolve_user_from_payload(data: dict) -> User | None:
     email = extract_customer_email(data)
     if email:
         user = User.objects.filter(email__iexact=email).first()
+        if user:
+            return user
+
+        # fallback: username igual ao e-mail
+        user = User.objects.filter(username__iexact=email).first()
         if user:
             return user
     return None

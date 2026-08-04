@@ -103,38 +103,86 @@ def checkout_success_view(request):
 def cakto_webhook_view(request):
     """
     Webhook da Cakto.
-    Configure no painel: Integrações > Webhooks
-    URL: https://SEU_DOMINIO/assinaturas/cakto/webhook/
-    Secret: o mesmo de CAKTO_WEBHOOK_SECRET
-    Eventos: purchase_approved, subscription_renewed, subscription_canceled, refund, chargeback
+    URL: https://zappro.sbs/assinaturas/cakto/webhook/
     """
+    raw = request.body.decode("utf-8") if request.body else ""
+    payload = {}
     try:
-        payload = json.loads(request.body.decode("utf-8") or "{}")
+        if raw.strip():
+            payload = json.loads(raw)
+        elif request.POST:
+            payload = request.POST.dict()
     except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "JSON inválido"}, status=400)
+        # Alguns webhooks mandam form/json quebrado — ainda registra
+        payload = {"_raw": raw[:4000]}
 
-    secret = str(payload.get("secret") or request.headers.get("X-Webhook-Secret") or "")
-    expected = getattr(settings, "CAKTO_WEBHOOK_SECRET", "")
-    if not expected or secret != expected:
-        logger.warning("Webhook Cakto com secret inválido")
-        return JsonResponse({"ok": False, "error": "Unauthorized"}, status=401)
+    if not isinstance(payload, dict):
+        payload = {"_payload": payload}
 
-    event = str(payload.get("event") or "")
+    event = str(
+        payload.get("event")
+        or payload.get("type")
+        or payload.get("status")
+        or "unknown"
+    )
     data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
 
-    log = CaktoWebhookLog.objects.create(event=event or "unknown", payload=payload)
+    secret = str(
+        payload.get("secret")
+        or payload.get("webhook_secret")
+        or request.headers.get("X-Webhook-Secret")
+        or request.headers.get("X-Cakto-Secret")
+        or request.GET.get("secret")
+        or ""
+    ).strip()
+    expected = str(getattr(settings, "CAKTO_WEBHOOK_SECRET", "") or "").strip()
+
+    # Sempre grava log (ajuda a diagnosticar secret/URL)
+    log = CaktoWebhookLog.objects.create(
+        event=event,
+        payload={
+            **payload,
+            "_meta": {
+                "content_type": request.content_type,
+                "has_secret": bool(secret),
+                "secret_tail": secret[-6:] if secret else "",
+                "expected_tail": expected[-6:] if expected else "",
+            },
+        },
+    )
+
+    if not expected or secret != expected:
+        log.detalhe = "Secret inválido ou ausente"
+        log.save(update_fields=["detalhe"])
+        logger.warning(
+            "Webhook Cakto secret inválido (recebido_tail=%s esperado_tail=%s)",
+            secret[-6:] if secret else "-",
+            expected[-6:] if expected else "-",
+        )
+        return JsonResponse({"ok": False, "error": "Unauthorized"}, status=401)
 
     try:
-        user = resolve_user_from_payload(data)
-        email = extract_customer_email(data)
-        order_id = extract_order_id(data)
-        sub_id = extract_subscription_id(data)
+        from .cakto_service import (
+            activate_subscription_from_payment,
+            extract_customer_email,
+            extract_order_id,
+            extract_subscription_id,
+            resolve_user_from_payload,
+            suspend_subscription_from_cancel,
+        )
+
+        user = resolve_user_from_payload(data) or resolve_user_from_payload(payload)
+        email = extract_customer_email(data) or extract_customer_email(payload)
+        order_id = extract_order_id(data) or extract_order_id(payload)
+        sub_id = extract_subscription_id(data) or extract_subscription_id(payload)
 
         activate_events = {
             "purchase_approved",
             "subscription_renewed",
             "compra_aprovada",
             "assinatura_renovada",
+            "paid",
+            "approved",
         }
         cancel_events = {
             "subscription_canceled",
@@ -144,11 +192,11 @@ def cakto_webhook_view(request):
             "reembolso",
         }
 
-        if event in activate_events:
+        event_l = event.lower()
+        if event in activate_events or event_l in activate_events:
             if not user:
                 log.detalhe = f"Usuário não encontrado (email={email})"
                 log.save(update_fields=["detalhe"])
-                # 200 para a Cakto não reenviar em loop; admin pode reconciliar
                 return JsonResponse({"ok": True, "matched": False})
 
             sub = activate_subscription_from_payment(
@@ -163,7 +211,7 @@ def cakto_webhook_view(request):
             log.save(update_fields=["processado", "detalhe"])
             return JsonResponse({"ok": True, "matched": True, "user_id": user.id})
 
-        if event in cancel_events:
+        if event in cancel_events or event_l in cancel_events:
             if user:
                 suspend_subscription_from_cancel(user, event=event)
                 log.processado = True
@@ -176,7 +224,7 @@ def cakto_webhook_view(request):
 
         log.detalhe = "Evento ignorado"
         log.save(update_fields=["detalhe"])
-        return JsonResponse({"ok": True, "ignored": True})
+        return JsonResponse({"ok": True, "ignored": True, "event": event})
     except Exception as exc:
         logger.exception("Erro webhook Cakto")
         log.detalhe = str(exc)
