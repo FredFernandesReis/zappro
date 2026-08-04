@@ -12,7 +12,8 @@ module.exports = {
       env: {
         PORT: 3001,
         API_SECRET: "um-segredo-forte",
-        DJANGO_WEBHOOK_URL: "http://127.0.0.1:8000/whatsapp/webhook/",
+        // VPS: Django ZapPro está em 8001 (8000 é outro projeto)
+        DJANGO_WEBHOOK_URL: "http://127.0.0.1:8001/whatsapp/webhook/",
       },
     },
   ],

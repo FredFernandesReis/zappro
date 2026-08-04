@@ -113,10 +113,7 @@ class MessageHandler:
         Processa mensagem recebida e envia resposta automática se aplicável.
         Retorna a resposta enviada ou None.
         """
-        if not self.plan:
-            logger.info("Assinatura inativa — mensagem ignorada (user %s)", self.user.id)
-            return None
-
+        # Sempre registra recebida no painel (mesmo sem plano ativo)
         Mensagem.objects.create(
             user=self.user,
             direcao="recebida",
@@ -124,6 +121,13 @@ class MessageHandler:
             telefone_origem=telefone,
             contato_nome=contato_nome,
         )
+
+        if not self.plan:
+            logger.info(
+                "Assinatura inativa — mensagem salva, sem autoresposta (user %s)",
+                self.user.id,
+            )
+            return None
 
         resposta_texto = None
         tipo_resposta = ""
