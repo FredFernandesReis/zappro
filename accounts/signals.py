@@ -1,8 +1,6 @@
 """
-Signals para criar perfil e assinatura automaticamente.
+Signals para criar perfil e assinatura pendente (só libera após pagamento Cakto).
 """
-
-from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
@@ -14,11 +12,11 @@ from .models import UserProfile
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Cria perfil e assinatura Mensal ao criar usuário."""
+    """Cria perfil. Contas novas ficam sem acesso até pagar na Cakto."""
     if created:
         UserProfile.objects.get_or_create(user=instance)
 
-        if not instance.is_superuser:
+        if not instance.is_superuser and not instance.is_staff:
             from subscriptions.models import Plan, Subscription
 
             plano = Plan.objects.filter(slug="basico", ativo=True).first()
@@ -27,7 +25,8 @@ def create_user_profile(sender, instance, created, **kwargs):
                     user=instance,
                     defaults={
                         "plan": plano,
-                        "status": "ativo",
-                        "data_vencimento": timezone.now().date() + timedelta(days=30),
+                        "status": "suspenso",
+                        # vencido: exige pagamento para ativar
+                        "data_vencimento": timezone.localdate(),
                     },
                 )

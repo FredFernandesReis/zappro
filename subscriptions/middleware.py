@@ -9,11 +9,9 @@ from django.urls import reverse
 
 class SubscriptionMiddleware:
     """
-    Bloqueia acesso às funções do sistema quando a assinatura está
-    vencida, suspensa ou cancelada.
+    Bloqueia acesso quando não há assinatura ativa (pagamento Cakto).
     """
 
-    # URLs liberadas mesmo com assinatura inativa
     EXEMPT_URLS = [
         "/accounts/",
         "/admin/",
@@ -35,55 +33,45 @@ class SubscriptionMiddleware:
 
             if not any(path.startswith(url) for url in self.EXEMPT_URLS):
                 subscription = getattr(request.user, "subscription", None)
+                assinatura_ok = bool(subscription and subscription.esta_ativa)
 
-                if subscription and not subscription.esta_ativa:
+                if not assinatura_ok:
                     if not request.session.get("subscription_warning_shown"):
-                        if subscription.esta_vencida:
+                        if not subscription:
                             messages.warning(
                                 request,
-                                "Sua assinatura venceu. Renove para continuar usando o ZapPro.",
+                                "Assine o plano Mensal (R$ 29,90) para usar o ZapPro.",
+                            )
+                        elif subscription.esta_vencida:
+                            messages.warning(
+                                request,
+                                "Sua assinatura venceu. Renove pelo pagamento Cakto para continuar.",
                             )
                         elif subscription.status == "suspenso":
-                            from django.conf import settings
-                            from django.utils.safestring import mark_safe
-
-                            display = getattr(settings, "ADMIN_WHATSAPP_DISPLAY", "")
-                            wa = getattr(settings, "ADMIN_WHATSAPP", "")
-                            if wa:
-                                url = f"https://wa.me/{wa}?text=Ol%C3%A1!%20Minha%20assinatura%20est%C3%A1%20suspensa."
-                                messages.warning(
-                                    request,
-                                    mark_safe(
-                                        f'Sua assinatura está suspensa. '
-                                        f'<a href="{url}" target="_blank" rel="noopener">Fale com o suporte no WhatsApp</a>'
-                                        f'{f" ({display})" if display else ""}.'
-                                    ),
-                                    extra_tags="html",
-                                )
-                            else:
-                                messages.warning(
-                                    request,
-                                    "Sua assinatura está suspensa. Entre em contato com o suporte.",
-                                )
+                            messages.warning(
+                                request,
+                                "Sua assinatura está pendente. Conclua o pagamento de R$ 29,90 para liberar o acesso.",
+                            )
                         elif subscription.status == "cancelado":
                             messages.error(
                                 request,
-                                "Sua assinatura foi cancelada. Renove para reativar o acesso.",
+                                "Sua assinatura foi cancelada. Assine novamente para reativar.",
                             )
                         request.session["subscription_warning_shown"] = True
 
-                    # Bloqueia funcionalidades, permite renovação, planos, ajuda e perfil
                     allowed = [
                         reverse("subscriptions:renew"),
                         reverse("subscriptions:plans"),
                         reverse("subscriptions:checkout"),
                         reverse("subscriptions:checkout_success"),
                         reverse("accounts:profile"),
-                        reverse("dashboard:home"),
                         reverse("dashboard:ajuda"),
                     ]
+                    # Home sem plano ativo vai para checkout
+                    if path == reverse("dashboard:home"):
+                        return redirect("subscriptions:checkout")
                     if path not in allowed and not path.startswith("/accounts/perfil"):
-                        return redirect("subscriptions:renew")
+                        return redirect("subscriptions:checkout")
 
         response = self.get_response(request)
         return response

@@ -74,7 +74,7 @@ class UserPasswordChangeView(PasswordChangeView):
 
 
 def register_view(request):
-    """Cadastro de novos usuários com plano Mensal (teste/assinatura)."""
+    """Cadastro: conta criada, assinatura só após pagamento Cakto."""
     if request.user.is_authenticated:
         return redirect("dashboard:home")
 
@@ -82,31 +82,15 @@ def register_view(request):
         form = RegisterForm(request.POST)
         if form.is_valid():
             user = form.save()
+            # Perfil/assinatura pendente vindos do signal
             UserProfile.objects.get_or_create(user=user)
-
-            from datetime import timedelta
-
-            from django.utils import timezone
-
-            from subscriptions.models import Plan, Subscription
-
-            plano = Plan.objects.filter(slug="basico", ativo=True).first()
-            if plano:
-                Subscription.objects.get_or_create(
-                    user=user,
-                    defaults={
-                        "plan": plano,
-                        "status": "ativo",
-                        "data_vencimento": timezone.now().date() + timedelta(days=30),
-                    },
-                )
 
             login(request, user)
             messages.success(
                 request,
-                "Conta criada com sucesso! Siga o checklist do painel para conectar o WhatsApp e criar sua primeira resposta.",
+                "Conta criada! Finalize o pagamento de R$ 29,90 para liberar o ZapPro.",
             )
-            return redirect("dashboard:home")
+            return redirect("subscriptions:checkout")
     else:
         form = RegisterForm()
 

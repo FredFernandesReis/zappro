@@ -2,7 +2,8 @@
 Comando para criar planos padrão e superusuário inicial.
 Uso: python manage.py setup_planos
 
-Apenas o plano Mensal (R$ 29,90) fica ativo para venda/exibição.
+Apenas o plano Mensal (R$ 29,90) fica ativo.
+Contas comuns ficam pendentes até pagar na Cakto.
 """
 
 from datetime import timedelta
@@ -20,7 +21,6 @@ class Command(BaseCommand):
     help = "Cria plano Mensal R$ 29,90 e superusuário admin"
 
     def handle(self, *args, **options):
-        # Desativa planos antigos (não apaga — assinaturas podem referenciar)
         Plan.objects.exclude(slug="basico").update(ativo=False)
         self.stdout.write("Planos antigos desativados.")
 
@@ -41,10 +41,16 @@ class Command(BaseCommand):
         status = "criado" if created else "atualizado"
         self.stdout.write(f"Plano {plan.nome} R$ {plan.preco_mensal} {status}.")
 
-        # Migra assinaturas ativas para o Mensal e estende vencimento (ambiente de teste)
-        venc = timezone.now().date() + timedelta(days=90)
-        atualizadas = Subscription.objects.update(plan=plan, status="ativo", data_vencimento=venc)
-        self.stdout.write(f"{atualizadas} assinatura(s) apontando para Mensal até {venc}.")
+        # Todas as assinaturas apontam ao Mensal, mas NÃO ficam liberadas
+        hoje = timezone.localdate()
+        pendentes = (
+            Subscription.objects.exclude(user__is_staff=True)
+            .exclude(user__is_superuser=True)
+            .update(plan=plan, status="suspenso", data_vencimento=hoje)
+        )
+        self.stdout.write(
+            f"{pendentes} assinatura(s) de clientes marcadas como pendentes (aguardam Cakto)."
+        )
 
         if not User.objects.filter(username="admin").exists():
             admin = User.objects.create_superuser(
@@ -57,7 +63,7 @@ class Command(BaseCommand):
                 user=admin,
                 plan=plan,
                 status="ativo",
-                data_vencimento=timezone.now().date() + timedelta(days=365),
+                data_vencimento=hoje + timedelta(days=365),
             )
             self.stdout.write(self.style.SUCCESS("Superusuário criado: admin / admin123"))
         else:
@@ -68,7 +74,7 @@ class Command(BaseCommand):
                 defaults={
                     "plan": plan,
                     "status": "ativo",
-                    "data_vencimento": timezone.now().date() + timedelta(days=365),
+                    "data_vencimento": hoje + timedelta(days=365),
                 },
             )
 
