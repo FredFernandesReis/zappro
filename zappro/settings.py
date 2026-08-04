@@ -8,6 +8,28 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+def _load_dotenv():
+    """Carrega .env local sem depender de python-dotenv."""
+    env_path = BASE_DIR / ".env"
+    if not env_path.exists():
+        return
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key:
+                os.environ.setdefault(key, value)
+    except OSError:
+        pass
+
+
+_load_dotenv()
+
 SECRET_KEY = "django-insecure-217m2hny331p8ynln3c7$hg*eg=24vxwcz%w^&sc_dt(^u5+0s"
 
 # Produção: DEBUG=False esconde páginas de erro detalhadas do público
@@ -19,6 +41,10 @@ ALLOWED_HOSTS = [
     "187.124.11.110",
     "localhost",
     "127.0.0.1",
+    ".ngrok-free.app",
+    ".ngrok-free.dev",
+    ".ngrok.app",
+    ".ngrok.io",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -26,7 +52,15 @@ CSRF_TRUSTED_ORIGINS = [
     "https://www.zappro.sbs",
     "http://zappro.sbs",
     "http://www.zappro.sbs",
+    # Domínios temporários do ngrok (preenchidos via NGROK_URL)
 ]
+
+_ngrok_url = os.environ.get("NGROK_URL", "").rstrip("/")
+if _ngrok_url:
+    CSRF_TRUSTED_ORIGINS.append(_ngrok_url)
+    # Também aceita http do mesmo host
+    if _ngrok_url.startswith("https://"):
+        CSRF_TRUSTED_ORIGINS.append("http://" + _ngrok_url[len("https://"):])
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -46,6 +80,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -98,6 +133,17 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# WhiteNoise: encontra arquivos mesmo com DEBUG=False (ngrok/VPS)
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -129,10 +175,15 @@ BOAS_VINDAS_INTERVALO_MINUTOS = 20
 ADMIN_WHATSAPP = "5531986427264"
 ADMIN_WHATSAPP_DISPLAY = "(31) 98642-7264"
 
-# Futura integração Mercado Pago
-# MERCADOPAGO_ACCESS_TOKEN = ""
-# MERCADOPAGO_WEBHOOK_SECRET = ""
-
-# Futura integração WhatsApp API Oficial
-# WHATSAPP_OFFICIAL_API_URL = ""
-# WHATSAPP_OFFICIAL_TOKEN = ""
+# Cakto — pagamento (use variáveis de ambiente em produção)
+CAKTO_CLIENT_ID = os.environ.get("CAKTO_CLIENT_ID", "")
+CAKTO_CLIENT_SECRET = os.environ.get("CAKTO_CLIENT_SECRET", "")
+CAKTO_CHECKOUT_URL = os.environ.get(
+    "CAKTO_CHECKOUT_URL",
+    "https://pay.cakto.com.br/h4c46wm_1021071",
+)
+# Secret que VOCÊ define no painel Cakto (Integrações > Webhooks)
+CAKTO_WEBHOOK_SECRET = os.environ.get("CAKTO_WEBHOOK_SECRET", "zappro-cakto-webhook-secreto")
+CAKTO_PLAN_DAYS = int(os.environ.get("CAKTO_PLAN_DAYS", "30"))
+# True = tenta embutir o checkout em iframe na página do ZapPro
+CAKTO_EMBED_IFRAME = os.environ.get("CAKTO_EMBED_IFRAME", "1") not in ("0", "false", "False")

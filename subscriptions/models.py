@@ -1,6 +1,6 @@
 """
 Models de planos e assinaturas.
-Preparado para futura integração com Mercado Pago.
+Integração Cakto para pagamento automático.
 """
 
 from django.contrib.auth.models import User
@@ -59,9 +59,10 @@ class Subscription(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
-    # Futura integração Mercado Pago
-    # mercadopago_subscription_id = models.CharField(max_length=100, blank=True)
-    # mercadopago_payer_id = models.CharField(max_length=100, blank=True)
+    cakto_customer_email = models.EmailField("E-mail Cakto", blank=True)
+    cakto_order_id = models.CharField("Último pedido Cakto", max_length=100, blank=True)
+    cakto_subscription_id = models.CharField("Assinatura Cakto", max_length=100, blank=True)
+    cakto_last_event = models.CharField("Último evento Cakto", max_length=80, blank=True)
 
     class Meta:
         verbose_name = "Assinatura"
@@ -72,7 +73,6 @@ class Subscription(models.Model):
 
     @property
     def esta_ativa(self):
-        """Verifica se a assinatura permite uso do sistema."""
         if self.status != "ativo":
             return False
         return self.data_vencimento >= timezone.now().date()
@@ -85,3 +85,21 @@ class Subscription(models.Model):
     def dias_restantes(self):
         delta = self.data_vencimento - timezone.now().date()
         return max(delta.days, 0)
+
+
+class CaktoWebhookLog(models.Model):
+    """Log de eventos recebidos da Cakto (auditoria / debug)."""
+
+    event = models.CharField(max_length=80)
+    payload = models.JSONField(default=dict)
+    processado = models.BooleanField(default=False)
+    detalhe = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log Webhook Cakto"
+        verbose_name_plural = "Logs Webhook Cakto"
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return f"{self.event} ({self.criado_em:%d/%m %H:%M})"

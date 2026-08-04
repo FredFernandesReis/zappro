@@ -75,5 +75,6 @@ class WhatsAppService:
         }
         if jid:
             payload["jid"] = jid
-        timeout = max(30, delay + 20)
+        # digitando mínimo ~3s no Node + margem de rede
+        timeout = max(45, delay + 35)
         return self._request("POST", "/send", payload, timeout=timeout)

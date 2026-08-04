@@ -16,20 +16,18 @@
                 {% endif %}
                 <p>Plano: <strong>{{ subscription.plan.nome }}</strong></p>
                 {% endif %}
-                <p>Renove sua assinatura para continuar usando o ZapPro.</p>
+                <p>Renove com pagamento automático pela Cakto para continuar usando o ZapPro.</p>
 
-                <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Preciso%20renovar%20minha%20assinatura%20no%20ZapPro."
-                   target="_blank" rel="noopener" class="btn btn-whatsapp btn-lg">
-                    <i class="bi bi-whatsapp"></i> Chamar Administrador
+                <a href="{% url 'subscriptions:checkout' %}" class="btn btn-whatsapp btn-lg">
+                    <i class="bi bi-credit-card"></i> Pagar R$ 29,90 e renovar
                 </a>
 
-                <p class="text-muted mt-3 mb-1">
-                    WhatsApp do administrador:
+                <p class="text-muted mt-3 mb-0 small">
+                    Use o mesmo e-mail da conta no checkout para liberação automática.
                 </p>
-                <p class="fw-semibold mb-3">{{ admin_whatsapp_display }}</p>
 
-                <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary">
-                    Ver Planos
+                <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary mt-3">
+                    Ver plano
                 </a>
             </div>
         </div>

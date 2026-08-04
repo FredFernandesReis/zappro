@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Pagamento{% endblock %}
+{% block page_title %}Pagamento{% endblock %}
+{% block content %}
+<div class="checkout-page">
+    <div class="checkout-header">
+        <div>
+            <h2 class="h4 mb-1">Assinar ZapPro — R$ 29,90/mês</h2>
+            <p class="text-muted mb-0 small">
+                Pague com segurança pela Cakto. Use o <strong>mesmo e-mail da sua conta</strong>
+                ({{ request.user.email|default:"cadastre no perfil" }}) para liberação automática.
+            </p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ checkout_url }}" target="_blank" rel="noopener" class="btn btn-whatsapp">
+                <i class="bi bi-box-arrow-up-right"></i> Abrir checkout
+            </a>
+            <a href="{% url 'subscriptions:checkout_success' %}" class="btn btn-outline-secondary">
+                Já paguei
+            </a>
+        </div>
+    </div>
+
+    {% if embed_iframe %}
+    <div class="checkout-frame-wrap mt-3">
+        <iframe
+            class="checkout-frame"
+            src="{{ checkout_url }}"
+            title="Checkout Cakto"
+            allow="payment *; clipboard-write"
+            referrerpolicy="no-referrer-when-downgrade"
+            loading="lazy"></iframe>
+        <p class="checkout-frame-hint text-muted small mt-2 mb-0">
+            Se a área acima ficar em branco, a Cakto bloqueou o iframe por segurança —
+            use o botão <strong>Abrir checkout</strong>. Sua assinatura será ativada automaticamente após o pagamento.
+        </p>
+    </div>
+    {% else %}
+    <div class="alert alert-info mt-3">
+        O pagamento abre na página segura da Cakto.
+        <a href="{{ checkout_url }}" target="_blank" rel="noopener" class="alert-link">Clique aqui para pagar</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block extra_css %}
+<style>
+.checkout-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.checkout-frame-wrap {
+    background: #fff;
+    border-radius: 16px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,.06);
+}
+.checkout-frame {
+    width: 100%;
+    min-height: 75vh;
+    border: 0;
+    border-radius: 12px;
+    background: #f8f9fa;
+}
+@media (max-width: 991.98px) {
+    .checkout-frame { min-height: 70vh; }
+    .checkout-header .btn { width: 100%; }
+}
+</style>
+{% endblock %}

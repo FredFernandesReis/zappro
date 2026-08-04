@@ -13,16 +13,16 @@
                     Conecte o WhatsApp, configure respostas por palavra-chave e atenda mais pessoas
                     sem perder mensagem.
                 </p>
-                <div class="d-flex flex-wrap gap-2 mt-4">
+                <div class="d-flex flex-wrap gap-2 mt-4 landing-cta-buttons">
                     <a href="{% url 'accounts:register' %}" class="btn btn-whatsapp btn-lg px-4">
-                        Começar grátis
+                        Começar agora
                     </a>
                     <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-light btn-lg px-4">
-                        Ver planos
+                        Ver plano
                     </a>
                 </div>
                 <p class="landing-note mt-3 mb-0">
-                    Assinatura pelo WhatsApp {{ admin_whatsapp_display }} — sem cartão no site.
+                    Plano mensal R$ 29,90 — assine pelo WhatsApp {{ admin_whatsapp_display }}.
                 </p>
             </div>
             <div class="col-lg-6">
@@ -31,7 +31,7 @@
                         <div class="chat-bubble in">Olá! Qual o horário de atendimento?</div>
                         <div class="chat-bubble out">Funcionamos de seg a sex, das 8h às 18h. Posso ajudar em algo mais?</div>
                         <div class="chat-bubble in">preço</div>
-                        <div class="chat-bubble out">Nosso plano Básico começa em valores acessíveis. Quer que eu te envie os detalhes?</div>
+                        <div class="chat-bubble out">Nosso plano mensal é R$ 29,90. Quer que eu te envie os detalhes?</div>
                         <div class="chat-meta"><i class="bi bi-lightning-charge-fill"></i> Resposta automática pelo ZapPro</div>
                     </div>
                 </div>
@@ -51,7 +51,7 @@
                 <div class="landing-step">
                     <span class="landing-step-num">1</span>
                     <h3>Crie sua conta</h3>
-                    <p>Cadastro rápido com plano gratuito para testar o sistema.</p>
+                    <p>Cadastro rápido e conexão do WhatsApp em poucos minutos.</p>
                 </div>
             </div>
             <div class="col-md-4">
@@ -107,9 +107,9 @@
 <section class="landing-cta">
     <div class="container text-center">
         <h2 class="landing-section-title text-white">Pronto para atender melhor?</h2>
-        <p class="landing-cta-text">Comece grátis ou fale conosco para assinar um plano.</p>
+        <p class="landing-cta-text">Assine o plano mensal por R$ 29,90 e comece a automatizar seu WhatsApp.</p>
         <div class="d-flex flex-wrap justify-content-center gap-2">
-            <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg px-4">Criar conta grátis</a>
+            <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg px-4">Criar conta</a>
             {% if admin_whatsapp_url %}
             <a href="{{ admin_whatsapp_url }}?text=Ol%C3%A1!%20Quero%20saber%20mais%20sobre%20o%20ZapPro."
                target="_blank" rel="noopener" class="btn btn-outline-light btn-lg px-4">

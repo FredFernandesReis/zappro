@@ -101,28 +101,79 @@ function rememberOutgoingMessage(userId, sent) {
     }
 }
 
+function looksLikeRealPhone(digits) {
+    if (!digits || digits.length < 10 || digits.length > 15) return false;
+    if (digits.startsWith('55')) {
+        return digits.length === 12 || digits.length === 13;
+    }
+    return digits.length <= 13;
+}
+
+/**
+ * Destino simples e estável:
+ * 1) número @s.whatsapp.net (melhor entrega)
+ * 2) jid da conversa (fallback — inclusive @lid)
+ */
 async function resolveTargetJid(sock, phone, jid) {
     const cleanPhone = String(phone || '').replace(/\D/g, '');
+    const rawJid = jid && String(jid).includes('@') ? String(jid).trim() : '';
     const candidates = [];
 
-    if (jid && String(jid).includes('@')) {
-        candidates.push(String(jid).trim());
+    if (looksLikeRealPhone(cleanPhone)) {
+        candidates.push(`${cleanPhone}@s.whatsapp.net`);
     }
 
-    if (cleanPhone && cleanPhone.length >= 10 && cleanPhone.length <= 15) {
-        const pnJid = `${cleanPhone}@s.whatsapp.net`;
-        try {
-            const lid =
-                (await sock.signalRepository?.lidMapping?.getLIDForPN?.(pnJid)) ||
-                null;
-            if (lid) candidates.push(lid);
-        } catch (err) {
-            console.warn('getLIDForPN falhou:', err.message);
-        }
-        candidates.push(pnJid);
+    if (rawJid && !candidates.includes(rawJid)) {
+        candidates.push(rawJid);
+    }
+
+    if (!candidates.length && cleanPhone) {
+        candidates.push(`${cleanPhone}@s.whatsapp.net`);
     }
 
     return [...new Set(candidates.filter(Boolean))];
+}
+
+/** Mantém "digitando..." visível durante o atraso. */
+async function runTypingIndicator(sock, jids, durationMs) {
+    const targets = [...new Set((jids || []).filter(Boolean))];
+    if (!targets.length || durationMs <= 0) return;
+
+    try {
+        await sock.sendPresenceUpdate('available');
+    } catch (_) {
+        // ignore
+    }
+
+    const composing = async () => {
+        for (const target of targets) {
+            try {
+                await sock.presenceSubscribe(target);
+                await sock.sendPresenceUpdate('composing', target);
+            } catch (err) {
+                console.warn(`digitando falhou em ${target}: ${err.message}`);
+            }
+        }
+    };
+
+    await composing();
+    console.log(`Digitando ${durationMs}ms -> ${targets.join(', ')}`);
+
+    const started = Date.now();
+    while (Date.now() - started < durationMs) {
+        const remaining = durationMs - (Date.now() - started);
+        await sleep(Math.min(2500, remaining));
+        if (Date.now() - started >= durationMs) break;
+        await composing();
+    }
+
+    for (const target of targets) {
+        try {
+            await sock.sendPresenceUpdate('paused', target);
+        } catch (_) {
+            // ignore
+        }
+    }
 }
 
 async function createSession(userId) {
@@ -157,7 +208,8 @@ async function createSession(userId) {
         logger,
         browser: ['ZapPro', 'Chrome', '1.0.0'],
         syncFullHistory: false,
-        markOnlineOnConnect: false,
+        // necessário para "digitando..." (presence) funcionar de forma confiável
+        markOnlineOnConnect: true,
         getMessage: async (key) => {
             const msg = msgStore.get(key.id);
             return msg || undefined;
@@ -411,33 +463,25 @@ app.post('/send', authMiddleware, async (req, res) => {
             });
         }
 
-        const delayMs = Math.min(Math.max(Number(delaySeconds) || 0, 0), 20) * 1000;
+        // Digitando: mínimo 3s para ficar visível; máx 20s
+        const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 20);
+        const typingMs = showTyping
+            ? Math.max(requestedDelay, 3) * 1000
+            : requestedDelay * 1000;
+
+        const chatJid = jid && String(jid).includes('@') ? String(jid).trim() : null;
+        const typingTargets = [...new Set([chatJid, ...candidates].filter(Boolean))];
+
+        if (showTyping) {
+            await runTypingIndicator(session.sock, typingTargets, typingMs);
+        } else if (typingMs > 0) {
+            await sleep(typingMs);
+        }
+
         let lastError = null;
 
         for (const targetJid of candidates) {
             try {
-                // Digitando no mesmo JID que vai receber a mensagem
-                if (showTyping) {
-                    try {
-                        await session.sock.presenceSubscribe(targetJid);
-                        await session.sock.sendPresenceUpdate('composing', targetJid);
-                    } catch (presenceErr) {
-                        console.warn('Presença digitando ignorada:', presenceErr.message);
-                    }
-                }
-
-                if (delayMs > 0) {
-                    await sleep(delayMs);
-                }
-
-                if (showTyping) {
-                    try {
-                        await session.sock.sendPresenceUpdate('paused', targetJid);
-                    } catch (_) {
-                        // ignore
-                    }
-                }
-
                 const sent = await session.sock.sendMessage(targetJid, {
                     text: String(message),
                 });
@@ -448,7 +492,7 @@ app.post('/send', authMiddleware, async (req, res) => {
 
                 rememberOutgoingMessage(userId, sent);
                 console.log(
-                    `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${delayMs}ms typing=${!!showTyping}`
+                    `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${typingMs}ms typing=${!!showTyping}`
                 );
                 return res.json({ success: true, jid: targetJid, messageId });
             } catch (err) {

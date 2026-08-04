@@ -14,15 +14,14 @@ from .models import UserProfile
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Cria perfil automaticamente ao criar usuário."""
+    """Cria perfil e assinatura Mensal ao criar usuário."""
     if created:
         UserProfile.objects.get_or_create(user=instance)
 
-        # Cria assinatura gratuita (exceto superusuários criados via admin)
         if not instance.is_superuser:
             from subscriptions.models import Plan, Subscription
 
-            plano = Plan.objects.filter(slug="gratuito").first()
+            plano = Plan.objects.filter(slug="basico", ativo=True).first()
             if plano:
                 Subscription.objects.get_or_create(
                     user=instance,

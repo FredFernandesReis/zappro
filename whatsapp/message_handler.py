@@ -4,6 +4,7 @@ Lógica de processamento de mensagens recebidas e envio de autorespostas.
 
 import logging
 import random
+import unicodedata
 from datetime import timedelta
 
 from django.conf import settings
@@ -16,6 +17,14 @@ from .models import ContatoAtendido, Mensagem, WhatsAppConnection
 from .services import WhatsAppService
 
 logger = logging.getLogger(__name__)
+
+
+def _normalizar(texto):
+    """minúsculas sem acento — 'Preço' e 'preco' batem igualmente."""
+    if not texto:
+        return ""
+    nfkd = unicodedata.normalize("NFKD", str(texto).lower().strip())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
 class MessageHandler:
@@ -44,11 +53,12 @@ class MessageHandler:
 
     def _buscar_resposta_palavra_chave(self, texto):
         """Busca resposta automática pela palavra-chave."""
-        texto_lower = texto.lower().strip()
+        texto_norm = _normalizar(texto)
         respostas = AutoResposta.objects.filter(user=self.user, status="ativa")
 
         for resposta in respostas:
-            if resposta.palavra_chave.lower() in texto_lower:
+            chave = _normalizar(resposta.palavra_chave)
+            if chave and chave in texto_norm:
                 return resposta.resposta
         return None
 
@@ -80,10 +90,10 @@ class MessageHandler:
         return True, config.mensagem
 
     def _delay_humano(self):
-        """Atraso aleatório para parecer resposta humana."""
+        """Atraso aleatório para parecer resposta humana (mín. 3s = digitando visível)."""
         base = int(getattr(settings, "AUTORESPOSTA_DELAY_SEGUNDOS", 4))
         variacao = int(getattr(settings, "AUTORESPOSTA_DELAY_VARIACAO_SEGUNDOS", 2))
-        base = max(base, 1)
+        base = max(base, 3)
         variacao = max(variacao, 0)
         return base + random.randint(0, variacao)
 
@@ -126,17 +136,18 @@ class MessageHandler:
             except ConfiguracaoHorario.DoesNotExist:
                 pass
 
-        if not resposta_texto:
-            precisa, mensagem_bv = self._precisa_boas_vindas(telefone)
-            if precisa:
-                resposta_texto = mensagem_bv
-                tipo_resposta = "boas_vindas"
-
+        # Palavra-chave primeiro (ex.: "Preço") — senão boas-vindas engolem o teste
         if not resposta_texto:
             resposta_palavra = self._buscar_resposta_palavra_chave(conteudo)
             if resposta_palavra:
                 resposta_texto = resposta_palavra
                 tipo_resposta = "palavra_chave"
+
+        if not resposta_texto:
+            precisa, mensagem_bv = self._precisa_boas_vindas(telefone)
+            if precisa:
+                resposta_texto = mensagem_bv
+                tipo_resposta = "boas_vindas"
 
         if resposta_texto:
             delay = self._delay_humano()

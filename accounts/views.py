@@ -74,7 +74,7 @@ class UserPasswordChangeView(PasswordChangeView):
 
 
 def register_view(request):
-    """Cadastro de novos usuários com plano gratuito automático."""
+    """Cadastro de novos usuários com plano Mensal (teste/assinatura)."""
     if request.user.is_authenticated:
         return redirect("dashboard:home")
 
@@ -84,18 +84,18 @@ def register_view(request):
             user = form.save()
             UserProfile.objects.get_or_create(user=user)
 
-            # Cria assinatura gratuita para novos usuários
+            from datetime import timedelta
+
+            from django.utils import timezone
+
             from subscriptions.models import Plan, Subscription
 
-            plano_gratuito = Plan.objects.filter(slug="gratuito").first()
-            if plano_gratuito:
-                from datetime import timedelta
-                from django.utils import timezone
-
+            plano = Plan.objects.filter(slug="basico", ativo=True).first()
+            if plano:
                 Subscription.objects.get_or_create(
                     user=user,
                     defaults={
-                        "plan": plano_gratuito,
+                        "plan": plano,
                         "status": "ativo",
                         "data_vencimento": timezone.now().date() + timedelta(days=30),
                     },

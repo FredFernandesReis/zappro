@@ -11,7 +11,7 @@ def get_active_plan(user):
         subscription = getattr(user, "subscription", None)
         if subscription and subscription.plan:
             return subscription.plan
-        return Plan.objects.filter(slug="premium").first()
+        return Plan.objects.filter(slug="basico", ativo=True).first()
 
     subscription = getattr(user, "subscription", None)
     if subscription and subscription.esta_ativa:
@@ -20,11 +20,11 @@ def get_active_plan(user):
 
 
 def get_plan_for_limits(user):
-    """Plano usado para limites de cadastro (fallback: gratuito)."""
+    """Plano usado para limites de cadastro (fallback: Mensal)."""
     plan = get_active_plan(user)
     if plan:
         return plan
-    return Plan.objects.filter(slug="gratuito").first()
+    return Plan.objects.filter(slug="basico", ativo=True).first()
 
 
 def can_create_autoresposta(user):
