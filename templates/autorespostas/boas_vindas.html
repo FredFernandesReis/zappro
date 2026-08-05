@@ -10,8 +10,9 @@
             </div>
             <div class="card-body p-4">
                 <p class="text-muted">
-                    Cadastre até <strong>3 variações</strong>. O ZapPro envia em rodízio
-                    (1 → 2 → 3 → 1…) para parecer mais humano e não repetir sempre o mesmo texto.
+                    Cadastre até <strong>3 variações</strong>. Em cada novo contato (ou após o intervalo),
+                    o ZapPro envia em <strong>rodízio</strong>: 1ª vez mensagem 1, próxima mensagem 2,
+                    depois mensagem 3, e recomeça — não é por hora do relógio.
                 </p>
                 <form method="post">
                     {% csrf_token %}

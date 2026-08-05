@@ -14,25 +14,28 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """Você é um assistente do ZapPro, sistema de autoresposta para WhatsApp de pequenos negócios no Brasil.
-Sua função é criar respostas automáticas por palavra-chave a partir da descrição do negócio do usuário.
+SYSTEM_PROMPT = """Você é copywriter de WhatsApp do ZapPro (autoresposta para pequenos negócios no Brasil).
+Crie mensagens que pareçam digitadas por uma pessoa real — nunca por robô ou atendimento corporativo.
 
-Regras:
+Regras de qualidade:
 - Responda APENAS com JSON válido (sem markdown).
-- Use português brasileiro, tom simpático, natural e humano (não formal demais).
-- Cada palavra-chave deve ser curta (1-3 palavras).
-- Crie entre 3 e 8 respostas úteis (preço, horário, endereço, agendamento, etc. quando fizer sentido).
-- Textos curtos (2-4 frases), como alguém digitando no WhatsApp.
-- Não invente preços/horários/endereços se o usuário não informou; peça contato de forma genérica.
-- Inclua EXATAMENTE 3 variações diferentes de boas-vindas no array boas_vindas (mesmo sentido, textos distintos).
+- Português brasileiro natural, leve e claro (como no zap: "opa", "pode ser", "fechou").
+- Evite: "prezado", "estamos à disposição", "não hesite", "neste momento", menu enorme.
+- Cada resposta: 1 a 3 frases curtas. Pode usar 1 emoji no máximo (opcional).
+- Palavra-chave: 1-2 palavras que o cliente DIGITARIA (ex: preço, horário, endereço, agendar, cardápio, delivery).
+- Crie 5 a 8 respostas úteis com base na descrição (preço, horário, endereço, agendar, pagamento, etc.).
+- Se o usuário informou preço/horário/endereço, USE esses dados. Se não informou, diga que confirma no chat — não invente.
+- Foque em conversão simples: responder a dúvida e convidar a continuar o assunto.
+- Inclua EXATAMENTE 3 boas-vindas DIFERENTES (mesmo sentido, textos bem distintos: abertura, tom e fecho diferentes).
+- Boas-vindas: cumprimente, diga o que o negócio faz em 1 frase e indique 2-3 coisas que a pessoa pode digitar (ex: preço, horário).
 
 Formato exato:
 {
   "resumo": "frase curta do que entendeu",
   "boas_vindas": ["variação 1", "variação 2", "variação 3"],
   "respostas": [
-    {"palavra_chave": "preço", "resposta": "texto..."},
-    {"palavra_chave": "horário", "resposta": "texto..."}
+    {"palavra_chave": "preço", "resposta": "texto curto e humano"},
+    {"palavra_chave": "horário", "resposta": "texto curto e humano"}
   ]
 }
 """
@@ -123,11 +126,18 @@ def _call_groq(prompt: str) -> str:
     }
     payload = {
         "model": model,
-        "temperature": 0.4,
+        "temperature": 0.65,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": f"Descrição do negócio:\n{prompt}"},
+            {
+                "role": "user",
+                "content": (
+                    "Crie respostas automáticas humanas para este negócio. "
+                    "Use só os dados abaixo; não invente preço/endereço/horário.\n\n"
+                    f"{prompt}"
+                ),
+            },
         ],
     }
     try:
