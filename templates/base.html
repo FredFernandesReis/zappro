@@ -46,8 +46,8 @@
                 <a href="{% url 'reports:user' %}" class="nav-link {% if request.resolver_match.app_name == 'reports' %}active{% endif %}">
                     <i class="bi bi-bar-chart"></i> Relatórios
                 </a>
-                <a href="{% url 'subscriptions:plans' %}" class="nav-link {% if request.resolver_match.url_name == 'plans' %}active{% endif %}">
-                    <i class="bi bi-gem"></i> Plano
+                <a href="{% url 'subscriptions:minha' %}" class="nav-link {% if request.resolver_match.url_name == 'minha' or request.resolver_match.url_name == 'plans' or request.resolver_match.url_name == 'checkout' %}active{% endif %}">
+                    <i class="bi bi-gem"></i> Assinatura
                 </a>
                 <a href="{% url 'dashboard:ajuda' %}" class="nav-link {% if request.resolver_match.url_name == 'ajuda' %}active{% endif %}">
                     <i class="bi bi-question-circle"></i> Ajuda
@@ -97,9 +97,11 @@
                 </div>
                 <div class="topbar-right">
                     {% if user_subscription %}
-                    <span class="badge plan-badge">{{ user_plan.nome }}</span>
+                    <a href="{% url 'subscriptions:minha' %}" class="badge plan-badge text-decoration-none">{{ user_plan.nome }}</a>
                     {% if not subscription_active %}
                     <span class="badge bg-danger">Vencido</span>
+                    {% elif subscription_expiring_soon %}
+                    <span class="badge bg-warning text-dark">{{ dias_restantes }}d</span>
                     {% endif %}
                     {% endif %}
                 </div>
@@ -147,6 +149,17 @@
                 </div>
                 {% endfor %}
                 {% if not user.is_authenticated %}</div>{% endif %}
+                {% endif %}
+
+                {% if user.is_authenticated and subscription_expiring_soon and request.resolver_match.url_name != 'minha' and request.resolver_match.url_name != 'checkout' %}
+                <div class="alert alert-warning alert-dismissible fade show renew-banner" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Sua assinatura vence em <strong>{{ dias_restantes }} dia(s)</strong>.
+                    <a href="{% url 'subscriptions:minha' %}" class="alert-link">Ver assinatura</a>
+                    ou
+                    <a href="{% url 'subscriptions:checkout' %}" class="alert-link">renovar agora</a>.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
                 {% endif %}
 
                 {% block auth_content %}

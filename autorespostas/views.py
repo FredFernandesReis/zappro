@@ -287,8 +287,13 @@ def assistente_salvar_view(request):
         )
         criadas += 1
 
-    boas_vindas = str(body.get("boas_vindas") or "").strip()[:2000]
-    aplicar_bv = bool(body.get("aplicar_boas_vindas")) and bool(boas_vindas)
+    boas_lista = body.get("boas_vindas_lista")
+    if not isinstance(boas_lista, list):
+        boas_lista = []
+    bv1 = str((boas_lista[0] if len(boas_lista) > 0 else body.get("boas_vindas")) or "").strip()[:2000]
+    bv2 = str((boas_lista[1] if len(boas_lista) > 1 else "") or "").strip()[:2000]
+    bv3 = str((boas_lista[2] if len(boas_lista) > 2 else "") or "").strip()[:2000]
+    aplicar_bv = bool(body.get("aplicar_boas_vindas")) and bool(bv1)
     bv_ok = False
     if aplicar_bv:
         plan = _get_user_plan(request.user)
@@ -296,7 +301,9 @@ def assistente_salvar_view(request):
             erros.append("Seu plano não inclui mensagem de boas-vindas.")
         else:
             config, _ = ConfiguracaoBoasVindas.objects.get_or_create(user=request.user)
-            config.mensagem = boas_vindas
+            config.mensagem = bv1
+            config.mensagem_2 = bv2
+            config.mensagem_3 = bv3
             config.ativo = True
             config.save()
             bv_ok = True

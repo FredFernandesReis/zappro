@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Minha Assinatura{% endblock %}
+{% block page_title %}Minha Assinatura{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card table-card mb-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-gem"></i> Sua assinatura</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if subscription %}
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="text-muted small">Plano</div>
+                        <div class="fw-semibold fs-5">{{ subscription.plan.nome }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small">Status</div>
+                        {% if subscription.esta_ativa %}
+                        <span class="badge bg-success">Ativa</span>
+                        {% elif subscription.esta_vencida %}
+                        <span class="badge bg-danger">Vencida</span>
+                        {% else %}
+                        <span class="badge bg-warning text-dark">{{ subscription.get_status_display }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small">Vencimento</div>
+                        <div class="fw-semibold">{{ subscription.data_vencimento|date:"d/m/Y" }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-muted small">Dias restantes</div>
+                        <div class="fw-semibold">
+                            {% if subscription.esta_ativa %}
+                                {{ subscription.dias_restantes }} dia(s)
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="text-muted small">Valor</div>
+                        <div>R$ {{ subscription.plan.preco_mensal }}/mês</div>
+                    </div>
+                </div>
+
+                {% if subscription.esta_ativa and subscription.dias_restantes <= 5 %}
+                <div class="alert alert-warning mt-4 mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Sua assinatura vence em <strong>{{ subscription.dias_restantes }} dia(s)</strong>.
+                    Renove agora para não perder o acesso ao WhatsApp automático.
+                </div>
+                {% elif not subscription.esta_ativa %}
+                <div class="alert alert-danger mt-4 mb-0">
+                    Assinatura inativa. Finalize o pagamento para voltar a usar o ZapPro.
+                </div>
+                {% endif %}
+
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    <a href="{% url 'subscriptions:checkout' %}" class="btn btn-whatsapp">
+                        <i class="bi bi-credit-card"></i>
+                        {% if subscription.esta_ativa %}Renovar agora{% else %}Assinar / pagar{% endif %}
+                    </a>
+                    <a href="{% url 'subscriptions:plans' %}" class="btn btn-outline-secondary">Ver plano</a>
+                </div>
+                {% else %}
+                <p class="text-muted mb-3">Você ainda não tem assinatura cadastrada.</p>
+                <a href="{% url 'subscriptions:checkout' %}" class="btn btn-whatsapp">
+                    Assinar plano mensal
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

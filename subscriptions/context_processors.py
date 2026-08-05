@@ -15,6 +15,8 @@ def subscription_context(request):
             if getattr(settings, "ADMIN_WHATSAPP", "")
             else ""
         ),
+        "subscription_expiring_soon": False,
+        "dias_restantes": None,
     }
     if request.user.is_authenticated:
         subscription = getattr(request.user, "subscription", None)
@@ -22,4 +24,8 @@ def subscription_context(request):
         if subscription:
             context["subscription_active"] = subscription.esta_ativa
             context["user_plan"] = subscription.plan
+            if subscription.esta_ativa:
+                dias = subscription.dias_restantes
+                context["dias_restantes"] = dias
+                context["subscription_expiring_soon"] = dias <= 5
     return context

@@ -28,16 +28,27 @@ class AutoRespostaForm(forms.ModelForm):
 
 
 class BoasVindasForm(forms.ModelForm):
-    """Configuração da mensagem de boas-vindas."""
+    """Configuração das mensagens de boas-vindas (até 3 variações)."""
 
     class Meta:
         model = ConfiguracaoBoasVindas
-        fields = ("ativo", "mensagem")
+        fields = ("ativo", "mensagem", "mensagem_2", "mensagem_3")
         widgets = {
             "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "mensagem": forms.Textarea(attrs={
                 "class": "form-control",
-                "rows": 6,
+                "rows": 4,
+                "placeholder": "Variação 1 — obrigatória se ativar",
+            }),
+            "mensagem_2": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Variação 2 — opcional (recomendado)",
+            }),
+            "mensagem_3": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Variação 3 — opcional (recomendado)",
             }),
         }
 

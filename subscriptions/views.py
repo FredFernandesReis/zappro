@@ -31,6 +31,17 @@ logger = logging.getLogger(__name__)
 
 
 @login_required
+def minha_assinatura_view(request):
+    """Painel da assinatura do usuário logado."""
+    subscription = getattr(request.user, "subscription", None)
+    return render(request, "subscriptions/minha_assinatura.html", {
+        "subscription": subscription,
+        "checkout_url": build_checkout_url(request.user),
+        "planos": Plan.objects.filter(ativo=True),
+    })
+
+
+@login_required
 def renew_view(request):
     """Página de aviso de renovação quando assinatura está inativa."""
     subscription = getattr(request.user, "subscription", None)

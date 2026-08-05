@@ -16,6 +16,7 @@ class SubscriptionMiddleware:
         "/accounts/",
         "/admin/",
         "/assinaturas/renovar/",
+        "/assinaturas/minha/",
         "/assinaturas/planos/",
         "/assinaturas/checkout/",
         "/assinaturas/cakto/",
@@ -61,6 +62,7 @@ class SubscriptionMiddleware:
 
                     allowed = [
                         reverse("subscriptions:renew"),
+                        reverse("subscriptions:minha"),
                         reverse("subscriptions:plans"),
                         reverse("subscriptions:checkout"),
                         reverse("subscriptions:checkout_success"),

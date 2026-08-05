@@ -87,15 +87,20 @@ class MessageHandler:
             # Passou o intervalo: permite boas-vindas de novo
             contato.delete()
 
-        return True, config.mensagem
+        mensagem = config.escolher_mensagem()
+        if not mensagem:
+            return False, None
+        return True, mensagem
 
-    def _delay_humano(self):
-        """Atraso aleatório para parecer resposta humana (mín. 3s = digitando visível)."""
-        base = int(getattr(settings, "AUTORESPOSTA_DELAY_SEGUNDOS", 4))
-        variacao = int(getattr(settings, "AUTORESPOSTA_DELAY_VARIACAO_SEGUNDOS", 2))
-        base = max(base, 3)
+    def _delay_humano(self, texto=""):
+        """Atraso aleatório + um pouco mais se a mensagem for longa."""
+        base = int(getattr(settings, "AUTORESPOSTA_DELAY_SEGUNDOS", 7))
+        variacao = int(getattr(settings, "AUTORESPOSTA_DELAY_VARIACAO_SEGUNDOS", 5))
+        base = max(base, 5)
         variacao = max(variacao, 0)
-        return base + random.randint(0, variacao)
+        # ~+1s a cada 70 caracteres, teto +4s (mais tempo "digitando")
+        extra = min(max(len(texto or "") // 70, 0), 4)
+        return base + extra + random.randint(0, variacao)
 
     def _registrar_boas_vindas(self, telefone):
         ContatoAtendido.objects.update_or_create(
@@ -154,7 +159,7 @@ class MessageHandler:
                 tipo_resposta = "boas_vindas"
 
         if resposta_texto:
-            delay = self._delay_humano()
+            delay = self._delay_humano(resposta_texto)
             show_typing = getattr(settings, "AUTORESPOSTA_MOSTRAR_DIGITANDO", True)
 
             result = self.whatsapp_service.send_message(

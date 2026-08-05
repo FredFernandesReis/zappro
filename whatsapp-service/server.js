@@ -463,8 +463,8 @@ app.post('/send', authMiddleware, async (req, res) => {
             });
         }
 
-        // Digitando: mínimo 3s para ficar visível; máx 20s
-        const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 20);
+        // Digitando: mínimo 3s para ficar visível; máx 25s (mensagens longas)
+        const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 25);
         const typingMs = showTyping
             ? Math.max(requestedDelay, 3) * 1000
             : requestedDelay * 1000;

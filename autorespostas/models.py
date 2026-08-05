@@ -32,15 +32,20 @@ class AutoResposta(models.Model):
 
 
 class ConfiguracaoBoasVindas(models.Model):
-    """Mensagem de boas-vindas enviada ao primeiro contato."""
+    """Mensagens de boas-vindas (até 3) enviadas ao primeiro contato, com rotação."""
 
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="config_boas_vindas"
     )
     ativo = models.BooleanField("Ativo", default=False)
     mensagem = models.TextField(
-        "Mensagem",
+        "Mensagem 1",
         default="Olá! Seja bem-vindo.\nDigite:\n1 - Vendas\n2 - Suporte\n3 - Financeiro",
+    )
+    mensagem_2 = models.TextField("Mensagem 2", blank=True, default="")
+    mensagem_3 = models.TextField("Mensagem 3", blank=True, default="")
+    ultima_variacao = models.PositiveSmallIntegerField(
+        "Última variação enviada", default=0
     )
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -50,6 +55,29 @@ class ConfiguracaoBoasVindas(models.Model):
 
     def __str__(self):
         return f"Boas-vindas de {self.user.username}"
+
+    def mensagens_ativas(self):
+        """Lista as mensagens preenchidas (1 a 3)."""
+        msgs = []
+        for texto in (self.mensagem, self.mensagem_2, self.mensagem_3):
+            limpo = (texto or "").strip()
+            if limpo:
+                msgs.append(limpo)
+        return msgs
+
+    def escolher_mensagem(self):
+        """
+        Escolhe a próxima variação em rodízio (1→2→3→1...).
+        Assim não manda sempre o mesmo texto.
+        """
+        msgs = self.mensagens_ativas()
+        if not msgs:
+            return None
+        idx = self.ultima_variacao % len(msgs)
+        escolhida = msgs[idx]
+        self.ultima_variacao = (idx + 1) % len(msgs)
+        self.save(update_fields=["ultima_variacao", "atualizado_em"])
+        return escolhida
 
 
 class ConfiguracaoHorario(models.Model):

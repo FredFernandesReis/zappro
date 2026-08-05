@@ -19,16 +19,17 @@ Sua função é criar respostas automáticas por palavra-chave a partir da descr
 
 Regras:
 - Responda APENAS com JSON válido (sem markdown).
-- Use português brasileiro, tom simpático e profissional.
-- Cada palavra-chave deve ser curta (1-3 palavras), sem acento opcional mas pode ter.
+- Use português brasileiro, tom simpático, natural e humano (não formal demais).
+- Cada palavra-chave deve ser curta (1-3 palavras).
 - Crie entre 3 e 8 respostas úteis (preço, horário, endereço, agendamento, etc. quando fizer sentido).
-- Não invente preços/horários/endereços se o usuário não informou; peça contato/WhatsApp de forma genérica.
-- Inclua uma sugestão de mensagem de boas-vindas no campo boas_vindas.
+- Textos curtos (2-4 frases), como alguém digitando no WhatsApp.
+- Não invente preços/horários/endereços se o usuário não informou; peça contato de forma genérica.
+- Inclua EXATAMENTE 3 variações diferentes de boas-vindas no array boas_vindas (mesmo sentido, textos distintos).
 
 Formato exato:
 {
   "resumo": "frase curta do que entendeu",
-  "boas_vindas": "texto da boas-vindas",
+  "boas_vindas": ["variação 1", "variação 2", "variação 3"],
   "respostas": [
     {"palavra_chave": "preço", "resposta": "texto..."},
     {"palavra_chave": "horário", "resposta": "texto..."}
@@ -89,9 +90,25 @@ def _normalize_suggestions(data: dict[str, Any]) -> dict[str, Any]:
     if not itens:
         raise ValueError("A IA não gerou respostas utilizáveis")
 
+    bv_raw = data.get("boas_vindas")
+    bv_list: list[str] = []
+    if isinstance(bv_raw, list):
+        for item in bv_raw:
+            texto = str(item or "").strip()[:2000]
+            if texto:
+                bv_list.append(texto)
+    elif isinstance(bv_raw, str) and bv_raw.strip():
+        bv_list.append(bv_raw.strip()[:2000])
+
+    # Garante até 3 slots para o frontend
+    while len(bv_list) < 3:
+        bv_list.append("")
+    bv_list = bv_list[:3]
+
     return {
         "resumo": str(data.get("resumo") or "").strip()[:300],
-        "boas_vindas": str(data.get("boas_vindas") or "").strip()[:2000],
+        "boas_vindas": bv_list[0],
+        "boas_vindas_lista": bv_list,
         "respostas": itens[:10],
     }
 
