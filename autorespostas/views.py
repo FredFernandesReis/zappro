@@ -202,7 +202,7 @@ def assistente_gerar_view(request):
         return JsonResponse(
             {
                 "ok": False,
-                "error": "IA não configurada. Peça ao administrador para definir OPENAI_API_KEY.",
+                "error": "IA não configurada. Peça ao administrador para definir GROQ_API_KEY.",
             },
             status=503,
         )

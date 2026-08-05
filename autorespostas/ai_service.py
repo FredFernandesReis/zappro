@@ -1,5 +1,5 @@
 """
-Assistente de IA para sugerir respostas automáticas (OpenAI).
+Assistente de IA para sugerir respostas automáticas (Groq — cota gratuita).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ Formato exato:
 
 
 def ai_configured() -> bool:
-    return bool(getattr(settings, "OPENAI_API_KEY", ""))
+    return bool(getattr(settings, "GROQ_API_KEY", ""))
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -96,10 +96,10 @@ def _normalize_suggestions(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _call_openai(prompt: str) -> str:
-    api_key = getattr(settings, "OPENAI_API_KEY", "")
-    model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
-    url = "https://api.openai.com/v1/chat/completions"
+def _call_groq(prompt: str) -> str:
+    api_key = getattr(settings, "GROQ_API_KEY", "")
+    model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -117,30 +117,29 @@ def _call_openai(prompt: str) -> str:
         resp = requests.post(url, headers=headers, json=payload, timeout=45)
     except requests.Timeout as exc:
         raise RuntimeError(
-            "A OpenAI demorou demais para responder. Tente de novo em instantes."
+            "A IA demorou demais para responder. Tente de novo em instantes."
         ) from exc
     except requests.RequestException as exc:
-        logger.error("OpenAI connection error: %s", exc)
+        logger.error("Groq connection error: %s", exc)
         raise RuntimeError(
-            "Não foi possível conectar à OpenAI pelo servidor. Verifique a internet do VPS."
+            "Não foi possível conectar à Groq pelo servidor. Verifique a internet do VPS."
         ) from exc
 
     if resp.status_code >= 400:
-        logger.error("OpenAI error %s: %s", resp.status_code, resp.text[:800])
+        logger.error("Groq error %s: %s", resp.status_code, resp.text[:800])
         detail = ""
         try:
             detail = str(resp.json().get("error", {}).get("message") or "")
         except Exception:
             detail = ""
-        low = detail.lower()
         if resp.status_code == 401:
-            raise RuntimeError("Chave OPENAI_API_KEY inválida. Gere outra em platform.openai.com.")
-        if resp.status_code == 429 or "quota" in low or "billing" in low or "insufficient" in low:
+            raise RuntimeError("Chave GROQ_API_KEY inválida. Gere em console.groq.com")
+        if resp.status_code == 429:
             raise RuntimeError(
-                "Sem crédito/limite na OpenAI. Adicione billing em platform.openai.com/account/billing."
+                "Limite gratuito da Groq atingido. Aguarde alguns minutos e tente de novo."
             )
         raise RuntimeError(
-            detail[:220] if detail else "Falha ao consultar a IA. Verifique OPENAI_API_KEY e billing."
+            detail[:220] if detail else "Falha ao consultar a IA. Verifique GROQ_API_KEY."
         )
 
     body = resp.json()
@@ -157,8 +156,8 @@ def generate_autorespostas(descricao: str) -> dict[str, Any]:
         raise ValueError("Descreva seu negócio com pelo menos algumas frases.")
 
     if not ai_configured():
-        raise RuntimeError("IA não configurada. Defina OPENAI_API_KEY no .env")
+        raise RuntimeError("IA não configurada. Defina GROQ_API_KEY no .env")
 
-    raw = _call_openai(texto)
+    raw = _call_groq(texto)
     data = _extract_json(raw)
     return _normalize_suggestions(data)

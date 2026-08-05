@@ -188,6 +188,6 @@ CAKTO_PLAN_DAYS = int(os.environ.get("CAKTO_PLAN_DAYS", "30"))
 # True = tenta embutir o checkout em iframe na página do ZapPro
 CAKTO_EMBED_IFRAME = os.environ.get("CAKTO_EMBED_IFRAME", "1") not in ("0", "false", "False")
 
-# Assistente de IA (OpenAI)
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+# Assistente de IA (Groq — cota gratuita) https://console.groq.com
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
