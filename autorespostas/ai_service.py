@@ -113,10 +113,36 @@ def _call_openai(prompt: str) -> str:
             {"role": "user", "content": f"Descrição do negócio:\n{prompt}"},
         ],
     }
-    resp = requests.post(url, headers=headers, json=payload, timeout=60)
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=45)
+    except requests.Timeout as exc:
+        raise RuntimeError(
+            "A OpenAI demorou demais para responder. Tente de novo em instantes."
+        ) from exc
+    except requests.RequestException as exc:
+        logger.error("OpenAI connection error: %s", exc)
+        raise RuntimeError(
+            "Não foi possível conectar à OpenAI pelo servidor. Verifique a internet do VPS."
+        ) from exc
+
     if resp.status_code >= 400:
-        logger.error("OpenAI error %s: %s", resp.status_code, resp.text[:500])
-        raise RuntimeError("Falha ao consultar a IA. Verifique a chave OPENAI_API_KEY.")
+        logger.error("OpenAI error %s: %s", resp.status_code, resp.text[:800])
+        detail = ""
+        try:
+            detail = str(resp.json().get("error", {}).get("message") or "")
+        except Exception:
+            detail = ""
+        low = detail.lower()
+        if resp.status_code == 401:
+            raise RuntimeError("Chave OPENAI_API_KEY inválida. Gere outra em platform.openai.com.")
+        if resp.status_code == 429 or "quota" in low or "billing" in low or "insufficient" in low:
+            raise RuntimeError(
+                "Sem crédito/limite na OpenAI. Adicione billing em platform.openai.com/account/billing."
+            )
+        raise RuntimeError(
+            detail[:220] if detail else "Falha ao consultar a IA. Verifique OPENAI_API_KEY e billing."
+        )
+
     body = resp.json()
     try:
         return body["choices"][0]["message"]["content"]

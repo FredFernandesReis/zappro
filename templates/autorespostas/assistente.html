@@ -20,6 +20,7 @@
 {% endif %}
 
 <div class="ai-assistant">
+    {% csrf_token %}
     <section class="ai-panel">
         <label for="ai-descricao" class="form-label fw-semibold">O que seu negócio faz?</label>
         <textarea
@@ -87,6 +88,8 @@
     const saveMsg = document.getElementById('ai-save-msg');
 
     function csrfToken() {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input && input.value) return input.value;
         const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
         return m ? decodeURIComponent(m[1]) : '';
     }
@@ -94,11 +97,22 @@
     function showError(msg) {
         errorEl.textContent = msg || 'Erro inesperado.';
         errorEl.classList.remove('d-none');
+        statusEl.textContent = '';
     }
 
     function hideError() {
         errorEl.classList.add('d-none');
         errorEl.textContent = '';
+    }
+
+    async function readJson(resp) {
+        const text = await resp.text();
+        if (!text) return {};
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error('Resposta inválida do servidor (HTTP ' + resp.status + ').');
+        }
     }
 
     function renderSugestoes(data) {
@@ -157,7 +171,9 @@
             return;
         }
         gerarBtn.disabled = true;
-        statusEl.textContent = 'Gerando com IA...';
+        statusEl.textContent = 'Gerando com IA... (pode levar até 45s)';
+        const controller = new AbortController();
+        const timer = setTimeout(function () { controller.abort(); }, 50000);
         try {
             const resp = await fetch('{% url "autorespostas:assistente_gerar" %}', {
                 method: 'POST',
@@ -166,17 +182,23 @@
                     'X-CSRFToken': csrfToken(),
                 },
                 body: JSON.stringify({ descricao: descricao }),
+                signal: controller.signal,
             });
-            const data = await resp.json();
-            if (!data.ok) {
-                showError(data.error || 'Não foi possível gerar sugestões.');
+            const data = await readJson(resp);
+            if (!resp.ok || !data.ok) {
+                showError(data.error || ('Erro HTTP ' + resp.status + ' ao gerar sugestões.'));
                 return;
             }
             renderSugestoes(data);
             statusEl.textContent = 'Pronto! Revise e salve o que quiser.';
         } catch (e) {
-            showError('Falha de rede ao gerar sugestões.');
+            if (e && e.name === 'AbortError') {
+                showError('Demorou demais. Confira a chave OpenAI/billing no VPS e tente de novo.');
+            } else {
+                showError((e && e.message) || 'Falha de rede ao gerar sugestões.');
+            }
         } finally {
+            clearTimeout(timer);
             gerarBtn.disabled = false;
         }
     });
@@ -221,11 +243,12 @@
                     aplicar_boas_vindas: !!(aplicarBvEl.checked && bvEl.value.trim()),
                 }),
             });
-            const data = await resp.json();
+            const data = await readJson(resp);
             saveMsg.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
-            if (!data.ok) {
+            if (!resp.ok || !data.ok) {
                 saveMsg.classList.add('alert-danger');
                 saveMsg.textContent = data.error || 'Não foi possível salvar.';
+                statusEl.textContent = '';
                 return;
             }
             saveMsg.classList.add('alert-success');
@@ -235,7 +258,7 @@
             saveMsg.textContent = msg;
             statusEl.textContent = 'Concluído.';
         } catch (e) {
-            showError('Falha de rede ao salvar.');
+            showError((e && e.message) || 'Falha de rede ao salvar.');
         } finally {
             salvarBtn.disabled = false;
         }
