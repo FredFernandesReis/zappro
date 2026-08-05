@@ -1,6 +1,5 @@
 """
-Assistente de IA para sugerir respostas automáticas.
-Suporta Gemini (padrão) ou OpenAI via variável de ambiente.
+Assistente de IA para sugerir respostas automáticas (OpenAI).
 """
 
 from __future__ import annotations
@@ -39,10 +38,7 @@ Formato exato:
 
 
 def ai_configured() -> bool:
-    return bool(
-        getattr(settings, "GEMINI_API_KEY", "")
-        or getattr(settings, "OPENAI_API_KEY", "")
-    )
+    return bool(getattr(settings, "OPENAI_API_KEY", ""))
 
 
 def _extract_json(text: str) -> dict[str, Any]:
@@ -50,7 +46,6 @@ def _extract_json(text: str) -> dict[str, Any]:
     if not text:
         raise ValueError("Resposta vazia da IA")
 
-    # remove ```json ... ```
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", text, re.I)
     if fence:
         text = fence.group(1).strip()
@@ -101,36 +96,6 @@ def _normalize_suggestions(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _call_gemini(prompt: str) -> str:
-    api_key = getattr(settings, "GEMINI_API_KEY", "")
-    model = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash")
-    url = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{model}:generateContent?key={api_key}"
-    )
-    payload = {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [{"text": f"{SYSTEM_PROMPT}\n\nDescrição do negócio:\n{prompt}"}],
-            }
-        ],
-        "generationConfig": {
-            "temperature": 0.4,
-            "responseMimeType": "application/json",
-        },
-    }
-    resp = requests.post(url, json=payload, timeout=60)
-    if resp.status_code >= 400:
-        logger.error("Gemini error %s: %s", resp.status_code, resp.text[:500])
-        raise RuntimeError("Falha ao consultar a IA (Gemini). Verifique a chave da API.")
-    body = resp.json()
-    try:
-        return body["candidates"][0]["content"]["parts"][0]["text"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("Resposta inesperada da IA") from exc
-
-
 def _call_openai(prompt: str) -> str:
     api_key = getattr(settings, "OPENAI_API_KEY", "")
     model = getattr(settings, "OPENAI_MODEL", "gpt-4o-mini")
@@ -151,7 +116,7 @@ def _call_openai(prompt: str) -> str:
     resp = requests.post(url, headers=headers, json=payload, timeout=60)
     if resp.status_code >= 400:
         logger.error("OpenAI error %s: %s", resp.status_code, resp.text[:500])
-        raise RuntimeError("Falha ao consultar a IA (OpenAI). Verifique a chave da API.")
+        raise RuntimeError("Falha ao consultar a IA. Verifique a chave OPENAI_API_KEY.")
     body = resp.json()
     try:
         return body["choices"][0]["message"]["content"]
@@ -165,14 +130,9 @@ def generate_autorespostas(descricao: str) -> dict[str, Any]:
     if len(texto) < 10:
         raise ValueError("Descreva seu negócio com pelo menos algumas frases.")
 
-    if getattr(settings, "GEMINI_API_KEY", ""):
-        raw = _call_gemini(texto)
-    elif getattr(settings, "OPENAI_API_KEY", ""):
-        raw = _call_openai(texto)
-    else:
-        raise RuntimeError(
-            "IA não configurada. Defina GEMINI_API_KEY ou OPENAI_API_KEY no .env"
-        )
+    if not ai_configured():
+        raise RuntimeError("IA não configurada. Defina OPENAI_API_KEY no .env")
 
+    raw = _call_openai(texto)
     data = _extract_json(raw)
     return _normalize_suggestions(data)
