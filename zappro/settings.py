@@ -187,3 +187,9 @@ CAKTO_WEBHOOK_SECRET = os.environ.get("CAKTO_WEBHOOK_SECRET", "zappro-cakto-webh
 CAKTO_PLAN_DAYS = int(os.environ.get("CAKTO_PLAN_DAYS", "30"))
 # True = tenta embutir o checkout em iframe na página do ZapPro
 CAKTO_EMBED_IFRAME = os.environ.get("CAKTO_EMBED_IFRAME", "1") not in ("0", "false", "False")
+
+# Assistente de IA (Gemini gratuito ou OpenAI)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")

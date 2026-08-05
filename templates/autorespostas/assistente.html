@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}Assistente de Respostas{% endblock %}
+{% block page_title %}Assistente IA{% endblock %}
+{% block content %}
+<div class="page-header mb-3">
+    <div>
+        <h1 class="h4 mb-1">Assistente de respostas</h1>
+        <p class="text-muted mb-0">Descreva seu negócio e a IA sugere palavras-chave e respostas prontas.</p>
+    </div>
+    <a href="{% url 'autorespostas:list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+{% if not ai_ok %}
+<div class="alert alert-warning">
+    A IA ainda não está configurada no servidor. Peça ao administrador para adicionar
+    <code>GEMINI_API_KEY</code> no <code>.env</code>.
+</div>
+{% endif %}
+
+<div class="ai-assistant">
+    <section class="ai-panel">
+        <label for="ai-descricao" class="form-label fw-semibold">O que seu negócio faz?</label>
+        <textarea
+            id="ai-descricao"
+            class="form-control ai-textarea"
+            rows="6"
+            maxlength="2000"
+            placeholder="Ex.: Sou barbeiro em BH. Atendo de terça a sábado, 9h às 19h. Corte R$ 45, barba R$ 35. Fica na Rua das Flores 120. Cliente pode agendar pelo WhatsApp."
+            {% if not ai_ok %}disabled{% endif %}
+        ></textarea>
+        <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
+            <button type="button" id="ai-gerar" class="btn btn-whatsapp" {% if not ai_ok %}disabled{% endif %}>
+                <i class="bi bi-stars"></i> Gerar sugestões
+            </button>
+            <span id="ai-status" class="text-muted small"></span>
+        </div>
+        <div id="ai-error" class="alert alert-danger mt-3 d-none" role="alert"></div>
+    </section>
+
+    <section id="ai-resultado" class="ai-panel mt-3 d-none">
+        <div id="ai-resumo" class="ai-resumo mb-3"></div>
+
+        <div id="ai-bv-wrap" class="ai-bv d-none mb-3">
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="ai-aplicar-bv" checked>
+                <label class="form-check-label fw-semibold" for="ai-aplicar-bv">
+                    Também aplicar mensagem de boas-vindas
+                </label>
+            </div>
+            <textarea id="ai-boas-vindas" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h6 mb-0">Sugestões</h2>
+            <button type="button" id="ai-toggle-all" class="btn btn-sm btn-link">Desmarcar todas</button>
+        </div>
+        <div id="ai-lista" class="ai-lista"></div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <button type="button" id="ai-salvar" class="btn btn-whatsapp">
+                <i class="bi bi-check2-circle"></i> Salvar selecionadas
+            </button>
+            <a href="{% url 'autorespostas:list' %}" class="btn btn-outline-secondary">Ver minhas respostas</a>
+        </div>
+        <div id="ai-save-msg" class="alert mt-3 d-none" role="alert"></div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const gerarBtn = document.getElementById('ai-gerar');
+    const salvarBtn = document.getElementById('ai-salvar');
+    const toggleAllBtn = document.getElementById('ai-toggle-all');
+    const descricaoEl = document.getElementById('ai-descricao');
+    const statusEl = document.getElementById('ai-status');
+    const errorEl = document.getElementById('ai-error');
+    const resultadoEl = document.getElementById('ai-resultado');
+    const listaEl = document.getElementById('ai-lista');
+    const resumoEl = document.getElementById('ai-resumo');
+    const bvWrap = document.getElementById('ai-bv-wrap');
+    const bvEl = document.getElementById('ai-boas-vindas');
+    const aplicarBvEl = document.getElementById('ai-aplicar-bv');
+    const saveMsg = document.getElementById('ai-save-msg');
+
+    function csrfToken() {
+        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    function showError(msg) {
+        errorEl.textContent = msg || 'Erro inesperado.';
+        errorEl.classList.remove('d-none');
+    }
+
+    function hideError() {
+        errorEl.classList.add('d-none');
+        errorEl.textContent = '';
+    }
+
+    function renderSugestoes(data) {
+        listaEl.innerHTML = '';
+        (data.respostas || []).forEach(function (item, idx) {
+            const card = document.createElement('article');
+            card.className = 'ai-item';
+            card.innerHTML =
+                '<div class="form-check">' +
+                '<input class="form-check-input ai-check" type="checkbox" id="ai-item-' + idx + '" checked>' +
+                '<label class="form-check-label w-100" for="ai-item-' + idx + '">' +
+                '<div class="ai-item-key">' + escapeHtml(item.palavra_chave) + '</div>' +
+                '</label></div>' +
+                '<textarea class="form-control ai-item-text mt-2" rows="3">' +
+                escapeHtml(item.resposta) +
+                '</textarea>';
+            card.dataset.chave = item.palavra_chave;
+            listaEl.appendChild(card);
+        });
+
+        if (data.resumo) {
+            resumoEl.textContent = data.resumo;
+            resumoEl.classList.remove('d-none');
+        } else {
+            resumoEl.textContent = '';
+            resumoEl.classList.add('d-none');
+        }
+
+        if (data.boas_vindas) {
+            bvEl.value = data.boas_vindas;
+            bvWrap.classList.remove('d-none');
+            aplicarBvEl.checked = true;
+        } else {
+            bvWrap.classList.add('d-none');
+            bvEl.value = '';
+        }
+
+        resultadoEl.classList.remove('d-none');
+        saveMsg.classList.add('d-none');
+    }
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    gerarBtn && gerarBtn.addEventListener('click', async function () {
+        hideError();
+        saveMsg.classList.add('d-none');
+        const descricao = (descricaoEl.value || '').trim();
+        if (descricao.length < 10) {
+            showError('Descreva seu negócio com um pouco mais de detalhe.');
+            return;
+        }
+        gerarBtn.disabled = true;
+        statusEl.textContent = 'Gerando com IA...';
+        try {
+            const resp = await fetch('{% url "autorespostas:assistente_gerar" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken(),
+                },
+                body: JSON.stringify({ descricao: descricao }),
+            });
+            const data = await resp.json();
+            if (!data.ok) {
+                showError(data.error || 'Não foi possível gerar sugestões.');
+                return;
+            }
+            renderSugestoes(data);
+            statusEl.textContent = 'Pronto! Revise e salve o que quiser.';
+        } catch (e) {
+            showError('Falha de rede ao gerar sugestões.');
+        } finally {
+            gerarBtn.disabled = false;
+        }
+    });
+
+    toggleAllBtn && toggleAllBtn.addEventListener('click', function () {
+        const checks = listaEl.querySelectorAll('.ai-check');
+        const allOn = Array.from(checks).every(function (c) { return c.checked; });
+        checks.forEach(function (c) { c.checked = !allOn; });
+        toggleAllBtn.textContent = allOn ? 'Marcar todas' : 'Desmarcar todas';
+    });
+
+    salvarBtn && salvarBtn.addEventListener('click', async function () {
+        hideError();
+        const cards = listaEl.querySelectorAll('.ai-item');
+        const respostas = [];
+        cards.forEach(function (card) {
+            const check = card.querySelector('.ai-check');
+            if (!check || !check.checked) return;
+            const chave = card.dataset.chave || '';
+            const texto = (card.querySelector('.ai-item-text').value || '').trim();
+            if (chave && texto) {
+                respostas.push({ palavra_chave: chave, resposta: texto });
+            }
+        });
+        if (!respostas.length && !(aplicarBvEl.checked && bvEl.value.trim())) {
+            showError('Marque ao menos uma resposta ou a boas-vindas.');
+            return;
+        }
+
+        salvarBtn.disabled = true;
+        statusEl.textContent = 'Salvando...';
+        try {
+            const resp = await fetch('{% url "autorespostas:assistente_salvar" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken(),
+                },
+                body: JSON.stringify({
+                    respostas: respostas,
+                    boas_vindas: bvEl.value.trim(),
+                    aplicar_boas_vindas: !!(aplicarBvEl.checked && bvEl.value.trim()),
+                }),
+            });
+            const data = await resp.json();
+            saveMsg.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+            if (!data.ok) {
+                saveMsg.classList.add('alert-danger');
+                saveMsg.textContent = data.error || 'Não foi possível salvar.';
+                return;
+            }
+            saveMsg.classList.add('alert-success');
+            let msg = 'Salvo: ' + (data.criadas || 0) + ' nova(s), ' + (data.atualizadas || 0) + ' atualizada(s).';
+            if (data.boas_vindas) msg += ' Boas-vindas aplicada.';
+            if (data.ignoradas) msg += ' ' + data.ignoradas + ' ignorada(s) pelo limite do plano.';
+            saveMsg.textContent = msg;
+            statusEl.textContent = 'Concluído.';
+        } catch (e) {
+            showError('Falha de rede ao salvar.');
+        } finally {
+            salvarBtn.disabled = false;
+        }
+    });
+})();
+</script>
+{% endblock %}

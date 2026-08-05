@@ -9,9 +9,14 @@
         <span class="badge bg-secondary">Limite: {{ plan.max_respostas }}</span>
         {% endif %}
     </div>
-    <a href="{% url 'autorespostas:create' %}" class="btn btn-whatsapp">
-        <i class="bi bi-plus-circle"></i> Nova
-    </a>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{% url 'autorespostas:assistente' %}" class="btn btn-outline-success">
+            <i class="bi bi-stars"></i> Assistente IA
+        </a>
+        <a href="{% url 'autorespostas:create' %}" class="btn btn-whatsapp">
+            <i class="bi bi-plus-circle"></i> Nova
+        </a>
+    </div>
 </div>
 
 {# Desktop: tabela #}
@@ -51,7 +56,9 @@
                 <tr>
                     <td colspan="4" class="text-center text-muted py-4">
                         Nenhuma resposta automática cadastrada.
-                        <a href="{% url 'autorespostas:create' %}">Criar a primeira</a>
+                        <a href="{% url 'autorespostas:assistente' %}">Usar assistente IA</a>
+                        ou
+                        <a href="{% url 'autorespostas:create' %}">criar manualmente</a>
                     </td>
                 </tr>
                 {% endfor %}
@@ -86,6 +93,7 @@
     <div class="empty-state">
         <i class="bi bi-chat-dots"></i>
         <p>Nenhuma resposta ainda.</p>
+        <a href="{% url 'autorespostas:assistente' %}" class="btn btn-outline-success mb-2">Assistente IA</a>
         <a href="{% url 'autorespostas:create' %}" class="btn btn-whatsapp">Criar a primeira</a>
     </div>
     {% endfor %}

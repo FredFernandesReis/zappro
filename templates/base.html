@@ -34,6 +34,9 @@
                 <a href="{% url 'autorespostas:list' %}" class="nav-link {% if request.resolver_match.app_name == 'autorespostas' and request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' %}active{% endif %}">
                     <i class="bi bi-chat-dots"></i> Respostas
                 </a>
+                <a href="{% url 'autorespostas:assistente' %}" class="nav-link {% if request.resolver_match.url_name == 'assistente' %}active{% endif %}">
+                    <i class="bi bi-stars"></i> Assistente IA
+                </a>
                 <a href="{% url 'autorespostas:boas_vindas' %}" class="nav-link {% if request.resolver_match.url_name == 'boas_vindas' %}active{% endif %}">
                     <i class="bi bi-hand-wave"></i> Boas-Vindas
                 </a>

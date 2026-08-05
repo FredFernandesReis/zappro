@@ -818,3 +818,45 @@ body.sidebar-open {
     border-color: transparent;
 }
 
+/* Assistente IA */
+.ai-assistant .ai-panel {
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    padding: 1.25rem;
+}
+
+.ai-textarea {
+    min-height: 140px;
+    resize: vertical;
+}
+
+.ai-resumo {
+    background: #e8f8ef;
+    color: #0f5132;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+}
+
+.ai-lista {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.ai-item {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    background: #fafbfc;
+}
+
+.ai-item-key {
+    font-weight: 600;
+    color: var(--primary-dark, #128c7e);
+}
+
+.ai-item-text {
+    font-size: 0.95rem;
+}
+
