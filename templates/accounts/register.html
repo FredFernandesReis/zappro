@@ -3,30 +3,57 @@
 {% block title %}Cadastro{% endblock %}
 
 {% block auth_content %}
-<div class="auth-wrapper">
-    <div class="card auth-card">
-        <div class="card-header">
-            <div class="auth-logo"><i class="bi bi-whatsapp"></i></div>
-            <h4 class="mt-2">Criar Conta</h4>
-            <p class="text-muted">Comece grátis com o ZapPro</p>
-        </div>
-        <div class="card-body px-4 pb-4">
-            <form method="post">
-                {% csrf_token %}
-                {% for field in form %}
-                <div class="mb-3">
-                    <label class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.errors %}<div class="text-danger small">{{ field.errors.0 }}</div>{% endif %}
-                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+<div class="auth-page">
+    <div class="auth-shell">
+        <aside class="auth-intro d-none d-lg-flex">
+            <a href="{% url 'dashboard:landing' %}" class="auth-brand">
+                <i class="bi bi-whatsapp"></i> ZapPro
+            </a>
+            <div>
+                <span class="auth-kicker">Comece em poucos minutos</span>
+                <h1>Automatize dúvidas repetidas e ganhe tempo para atender melhor.</h1>
+                <p>Depois do cadastro, ative o plano, conecte seu WhatsApp pelo QR Code e configure suas respostas.</p>
+                <div class="auth-feature-list">
+                    <span><strong>1</strong> Crie sua conta</span>
+                    <span><strong>2</strong> Ative por R$ 29,90/mês</span>
+                    <span><strong>3</strong> Conecte e configure</span>
                 </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-whatsapp w-100 mb-3">Criar Conta</button>
-            </form>
-            <p class="text-center mb-0">
-                Já tem conta? <a href="{% url 'accounts:login' %}">Entrar</a>
-            </p>
-        </div>
+            </div>
+            <small>Pagamento seguro processado pela Cakto</small>
+        </aside>
+
+        <main class="auth-form-area auth-form-area-register">
+            <div class="card auth-card auth-card-register">
+                <div class="card-header">
+                    <div class="auth-logo"><i class="bi bi-whatsapp"></i></div>
+                    <span class="auth-mobile-brand d-lg-none">ZapPro</span>
+                    <h2>Crie sua conta</h2>
+                    <p class="text-muted">Preencha seus dados para começar a configurar o ZapPro.</p>
+                </div>
+                <div class="card-body px-4 px-sm-5 pb-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.errors %}<div class="text-danger small">{{ field.errors.0 }}</div>{% endif %}
+                            {% if field.help_text %}<div class="form-text auth-help">{{ field.help_text|safe }}</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-whatsapp btn-lg w-100 mb-3">
+                            Criar conta e continuar <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </form>
+                    <p class="auth-terms">
+                        Ao criar sua conta, você poderá revisar o plano antes de concluir o pagamento.
+                    </p>
+                    <p class="text-center mb-0">
+                        Já tem uma conta? <a href="{% url 'accounts:login' %}" class="fw-semibold">Entrar</a>
+                    </p>
+                </div>
+            </div>
+        </main>
     </div>
 </div>
 {% endblock %}

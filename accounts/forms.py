@@ -20,11 +20,20 @@ class LoginForm(AuthenticationForm):
 
     username = forms.CharField(
         label="Usuário ou E-mail",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Usuário"}),
+        widget=forms.TextInput(attrs={
+            "class": "form-control form-control-lg",
+            "placeholder": "Digite seu usuário",
+            "autocomplete": "username",
+            "autofocus": True,
+        }),
     )
     password = forms.CharField(
         label="Senha",
-        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Senha"}),
+        widget=forms.PasswordInput(attrs={
+            "class": "form-control form-control-lg",
+            "placeholder": "Digite sua senha",
+            "autocomplete": "current-password",
+        }),
     )
 
 
@@ -32,18 +41,31 @@ class RegisterForm(UserCreationForm):
     """Cadastro de novos usuários."""
 
     email = forms.EmailField(
+        label="E-mail",
         required=True,
-        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "E-mail"}),
+        widget=forms.EmailInput(attrs={
+            "class": "form-control",
+            "placeholder": "voce@empresa.com",
+            "autocomplete": "email",
+        }),
     )
     first_name = forms.CharField(
         label="Nome",
         required=True,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Nome"}),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Seu nome",
+            "autocomplete": "given-name",
+        }),
     )
     last_name = forms.CharField(
         label="Sobrenome",
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Sobrenome"}),
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Seu sobrenome",
+            "autocomplete": "family-name",
+        }),
     )
 
     class Meta:
@@ -52,8 +74,21 @@ class RegisterForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field in ("username", "password1", "password2"):
-            self.fields[field].widget.attrs.update({"class": "form-control"})
+        self.fields["username"].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Escolha um nome de usuário",
+            "autocomplete": "username",
+        })
+        self.fields["password1"].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Crie uma senha segura",
+            "autocomplete": "new-password",
+        })
+        self.fields["password2"].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Digite a senha novamente",
+            "autocomplete": "new-password",
+        })
 
     def save(self, commit=True):
         user = super().save(commit=False)
