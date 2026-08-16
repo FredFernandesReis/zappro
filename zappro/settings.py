@@ -38,7 +38,7 @@ DEBUG = False
 ALLOWED_HOSTS = [
     "zappro.sbs",
     "www.zappro.sbs",
-    "187.124.11.110",
+    "2.25.102.23",
     "localhost",
     "127.0.0.1",
     ".ngrok-free.app",
