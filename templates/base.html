@@ -34,6 +34,9 @@
                 <a href="{% url 'autorespostas:list' %}" class="nav-link {% if request.resolver_match.app_name == 'autorespostas' and request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'create' or request.resolver_match.url_name == 'edit' %}active{% endif %}">
                     <i class="bi bi-chat-dots"></i> Respostas
                 </a>
+                <a href="{% url 'autorespostas:modelos' %}" class="nav-link {% if request.resolver_match.url_name == 'modelos' %}active{% endif %}">
+                    <i class="bi bi-collection"></i> Modelos Prontos
+                </a>
                 <a href="{% url 'autorespostas:assistente' %}" class="nav-link {% if request.resolver_match.url_name == 'assistente' %}active{% endif %}">
                     <i class="bi bi-stars"></i> Assistente IA
                 </a>
@@ -162,6 +165,21 @@
                 </div>
                 {% endif %}
 
+                {% if user.is_authenticated %}
+                <div id="whatsappDisconnectAlert"
+                     class="alert alert-danger connection-alert {% if not whatsapp_disconnected %}d-none{% endif %}"
+                     role="alert">
+                    <div>
+                        <i class="bi bi-wifi-off"></i>
+                        <strong>Seu WhatsApp está desconectado.</strong>
+                        As respostas automáticas estão pausadas até você reconectar.
+                    </div>
+                    <a href="{% url 'whatsapp:connection' %}" class="btn btn-danger btn-sm">
+                        <i class="bi bi-qr-code"></i> Reconectar agora
+                    </a>
+                </div>
+                {% endif %}
+
                 {% block auth_content %}
                 {% block content %}{% endblock %}
                 {% endblock %}
@@ -209,6 +227,39 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{% static 'js/main.js' %}"></script>
+    {% if user.is_authenticated %}
+    <script>
+    (function () {
+        const alertBox = document.getElementById('whatsappDisconnectAlert');
+        if (!alertBox) return;
+
+        let wasConnected = '{{ whatsapp_connection.status|default:"" }}' === 'conectado';
+        const checkConnection = function () {
+            fetch('{% url "whatsapp:status" %}', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('Falha ao verificar conexão');
+                    return response.json();
+                })
+                .then(function (data) {
+                    if (data.status === 'conectado') {
+                        wasConnected = true;
+                        alertBox.classList.add('d-none');
+                    } else if (data.status === 'desconectado' && wasConnected) {
+                        alertBox.classList.remove('d-none');
+                    }
+                })
+                .catch(function () {
+                    // Mantém o último estado exibido se a verificação falhar.
+                });
+        };
+
+        window.setInterval(checkConnection, 30000);
+    }());
+    </script>
+    {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
 </html>

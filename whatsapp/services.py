@@ -61,7 +61,7 @@ class WhatsAppService:
 
     def get_status(self, user_id):
         """Obtém status da conexão."""
-        return self._request("GET", f"/status/{user_id}")
+        return self._request("GET", f"/status/{user_id}", timeout=5)
 
     def send_message(self, user_id, phone, message, jid=None, delay_seconds=0, show_typing=False):
         """Envia mensagem via WhatsApp."""

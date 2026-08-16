@@ -11,6 +11,7 @@ app_name = "autorespostas"
 
 urlpatterns = [
     path("", views.list_view, name="list"),
+    path("modelos/", views.modelos_view, name="modelos"),
     path("criar/", views.create_view, name="create"),
     path("assistente/", views.assistente_view, name="assistente"),
     path("assistente/gerar/", views.assistente_gerar_view, name="assistente_gerar"),

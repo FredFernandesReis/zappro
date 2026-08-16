@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -56,6 +57,9 @@ def connection_view(request):
     status_result = service.get_status(request.user.id)
     if status_result.get("success"):
         connection.status = status_result.get("status", connection.status)
+        if connection.status == "conectado":
+            connection.conectado_em = connection.conectado_em or timezone.now()
+            connection.qr_code = ""
         if status_result.get("qrCode"):
             connection.qr_code = status_result["qrCode"]
         if status_result.get("phone"):
@@ -76,11 +80,18 @@ def status_api(request):
 
     if result.get("success"):
         connection.status = result.get("status", connection.status)
+        if connection.status == "conectado":
+            connection.conectado_em = connection.conectado_em or timezone.now()
+            connection.qr_code = ""
         if result.get("qrCode"):
             connection.qr_code = result["qrCode"]
         if result.get("phone"):
             connection.numero_telefone = result["phone"]
         connection.save()
+    elif connection.status == "conectado":
+        # Se o serviço Node ficar indisponível, as automações também param.
+        connection.status = "desconectado"
+        connection.save(update_fields=["status", "atualizado_em"])
 
     return JsonResponse({
         "status": connection.status,
@@ -119,6 +130,9 @@ def webhook_view(request):
 
     if event_type == "connection.update":
         connection.status = data.get("status", connection.status)
+        if connection.status == "conectado":
+            connection.conectado_em = connection.conectado_em or timezone.now()
+            connection.qr_code = ""
         if data.get("phone"):
             connection.numero_telefone = data["phone"]
         if data.get("qrCode"):

@@ -17,6 +17,7 @@ from django.utils.html import strip_tags
 from .ai_service import ai_configured, generate_autorespostas
 from .forms import AutoRespostaForm, BoasVindasForm, HorarioForm
 from .models import AutoResposta, ConfiguracaoBoasVindas, ConfiguracaoHorario
+from .presets import PRESETS
 from subscriptions.plan_utils import get_active_plan, can_create_autoresposta
 
 
@@ -66,6 +67,84 @@ def list_view(request):
         "plan": plan,
         "total": respostas.count(),
     })
+
+
+@login_required
+def modelos_view(request):
+    """Lista e aplica pacotes prontos de respostas por segmento."""
+    if request.method == "POST":
+        slug = (request.POST.get("modelo") or "").strip()
+        preset = PRESETS.get(slug)
+        if not preset:
+            messages.error(request, "Modelo não encontrado.")
+            return redirect("autorespostas:modelos")
+
+        criadas = 0
+        atualizadas = 0
+        ignoradas = 0
+
+        for item in preset["respostas"]:
+            existente = AutoResposta.objects.filter(
+                user=request.user,
+                palavra_chave__iexact=item["palavra_chave"],
+            ).first()
+            if existente:
+                existente.resposta = item["resposta"]
+                existente.status = "ativa"
+                existente.save(update_fields=["resposta", "status", "atualizado_em"])
+                atualizadas += 1
+                continue
+
+            pode_criar, _ = _check_response_limit(request.user)
+            if not pode_criar:
+                ignoradas += 1
+                continue
+
+            AutoResposta.objects.create(
+                user=request.user,
+                palavra_chave=item["palavra_chave"],
+                resposta=item["resposta"],
+                status="ativa",
+            )
+            criadas += 1
+
+        boas_vindas_ok = False
+        plan = _get_user_plan(request.user)
+        if not plan or plan.permite_boas_vindas:
+            boas = preset["boas_vindas"]
+            config, _ = ConfiguracaoBoasVindas.objects.get_or_create(user=request.user)
+            config.mensagem = boas[0]
+            config.mensagem_2 = boas[1]
+            config.mensagem_3 = boas[2]
+            config.ultima_variacao = 0
+            config.ativo = True
+            config.save()
+            boas_vindas_ok = True
+
+        resumo = f"{criadas} resposta(s) criada(s)"
+        if atualizadas:
+            resumo += f" e {atualizadas} atualizada(s)"
+        if boas_vindas_ok:
+            resumo += ", com 3 boas-vindas em rodízio"
+        messages.success(request, f"Modelo “{preset['nome']}” aplicado: {resumo}.")
+
+        if ignoradas:
+            messages.warning(
+                request,
+                f"{ignoradas} resposta(s) não foram adicionadas por causa do limite do plano.",
+            )
+        if plan and not plan.permite_boas_vindas:
+            messages.warning(
+                request,
+                "As boas-vindas do modelo não foram aplicadas porque seu plano não inclui esse recurso.",
+            )
+        return redirect("autorespostas:list")
+
+    return render(
+        request,
+        "autorespostas/modelos.html",
+        {"modelos": PRESETS},
+    )
 
 
 @login_required

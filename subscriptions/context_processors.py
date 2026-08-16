@@ -4,6 +4,8 @@ Context processor para disponibilizar dados da assinatura nos templates.
 
 from django.conf import settings
 
+from whatsapp.models import WhatsAppConnection
+
 
 def subscription_context(request):
     """Injeta informações da assinatura e contato do admin nos templates."""
@@ -17,6 +19,8 @@ def subscription_context(request):
         ),
         "subscription_expiring_soon": False,
         "dias_restantes": None,
+        "whatsapp_connection": None,
+        "whatsapp_disconnected": False,
     }
     if request.user.is_authenticated:
         subscription = getattr(request.user, "subscription", None)
@@ -28,4 +32,11 @@ def subscription_context(request):
                 dias = subscription.dias_restantes
                 context["dias_restantes"] = dias
                 context["subscription_expiring_soon"] = dias <= 5
+        connection = WhatsAppConnection.objects.filter(user=request.user).first()
+        context["whatsapp_connection"] = connection
+        context["whatsapp_disconnected"] = bool(
+            connection
+            and connection.status == "desconectado"
+            and (connection.conectado_em or connection.numero_telefone)
+        )
     return context

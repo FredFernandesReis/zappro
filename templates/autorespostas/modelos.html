@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Modelos Prontos{% endblock %}
+{% block page_title %}Modelos Prontos{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <div>
+        <h4 class="mb-1">Escolha o seu tipo de negócio</h4>
+        <p class="text-muted mb-0">
+            Aplique respostas e 3 variações de boas-vindas prontas. Depois, personalize valores, endereço e horários.
+        </p>
+    </div>
+    <a href="{% url 'autorespostas:list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Voltar
+    </a>
+</div>
+
+<div class="alert alert-info d-flex gap-2 align-items-start">
+    <i class="bi bi-info-circle-fill mt-1"></i>
+    <div>
+        Os textos não inventam preços nem informações do seu negócio.
+        Depois de aplicar, abra cada resposta para completar os detalhes.
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for slug, modelo in modelos.items %}
+    <div class="col-md-6 col-xl-4">
+        <article class="card table-card preset-card h-100">
+            <div class="card-body p-4 d-flex flex-column">
+                <div class="preset-icon text-{{ modelo.cor }} bg-{{ modelo.cor }} bg-opacity-10">
+                    <i class="bi bi-{{ modelo.icone }}"></i>
+                </div>
+                <h5 class="mt-3 mb-1">{{ modelo.nome }}</h5>
+                <p class="text-muted small">{{ modelo.descricao }}</p>
+
+                <div class="preset-preview mb-4">
+                    <span class="small fw-semibold text-muted">Inclui:</span>
+                    <ul class="small mb-0 mt-2">
+                        {% for item in modelo.respostas %}
+                        <li>{{ item.palavra_chave }}</li>
+                        {% endfor %}
+                        <li>3 mensagens de boas-vindas</li>
+                    </ul>
+                </div>
+
+                <form method="post" class="mt-auto"
+                      onsubmit="return confirm('Aplicar este modelo? Respostas com a mesma palavra-chave serão atualizadas.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="modelo" value="{{ slug }}">
+                    <button type="submit" class="btn btn-whatsapp w-100">
+                        <i class="bi bi-magic"></i> Usar este modelo
+                    </button>
+                </form>
+            </div>
+        </article>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

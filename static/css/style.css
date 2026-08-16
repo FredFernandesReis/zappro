@@ -101,6 +101,28 @@ body {
     padding: 1.5rem;
 }
 
+.connection-alert {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border-left: 4px solid #b02a37;
+}
+
+.connection-alert > div {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 575.98px) {
+    .connection-alert {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
 .sidebar-brand {
     padding: 1.25rem 1.5rem;
     font-size: 1.4rem;
@@ -1100,6 +1122,37 @@ body.sidebar-open {
 
 .onboarding-step.done {
     background: #e8f8ef;
+}
+
+/* Ready-made autoresponse presets */
+.preset-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.preset-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(20, 70, 55, 0.1);
+}
+
+.preset-icon {
+    display: inline-flex;
+    width: 3rem;
+    height: 3rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 1.35rem;
+}
+
+.preset-preview {
+    padding: 0.9rem;
+    border-radius: 12px;
+    background: #f6f8f7;
+}
+
+.preset-preview li {
+    margin-bottom: 0.25rem;
+    color: #52635d;
 }
 
 /* Ajuda */
