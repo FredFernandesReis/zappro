@@ -34,8 +34,47 @@ const sessions = {};
 const reconnectAttempts = {};
 /** Cache de mensagens enviadas para getMessage (obrigatório no Baileys 7 / retries) */
 const messageStores = {};
+/** IDs recebidos recentemente, para ignorar reentregas do mesmo evento. */
+const incomingMessageIds = {};
+/** Fila por conta: impede dois envios simultâneos do mesmo WhatsApp. */
+const sendQueues = {};
+const lastSentAt = {};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isDuplicateIncoming(userId, messageId) {
+    if (!messageId) return false;
+
+    const now = Date.now();
+    const ttlMs = 10 * 60 * 1000;
+    const seen = incomingMessageIds[userId] || new Map();
+
+    // Limpeza leve e limitada para não crescer memória indefinidamente.
+    if (seen.size > 500) {
+        for (const [id, timestamp] of seen.entries()) {
+            if (now - timestamp > ttlMs) seen.delete(id);
+        }
+    }
+
+    if (seen.has(messageId)) return true;
+    seen.set(messageId, now);
+    incomingMessageIds[userId] = seen;
+    return false;
+}
+
+function enqueueSend(userId, job) {
+    const previous = sendQueues[userId] || Promise.resolve();
+    const current = previous.catch(() => {}).then(job);
+    sendQueues[userId] = current;
+
+    current
+        .finally(() => {
+            if (sendQueues[userId] === current) delete sendQueues[userId];
+        })
+        .catch(() => {});
+
+    return current;
+}
 
 if (!fs.existsSync(SESSIONS_DIR)) {
     fs.mkdirSync(SESSIONS_DIR, { recursive: true });
@@ -287,6 +326,9 @@ async function createSession(userId) {
                 if (loggedOut || attempts >= MAX_RECONNECT_ATTEMPTS) {
                     clearSessionFiles(userId);
                     delete messageStores[userId];
+                    delete incomingMessageIds[userId];
+                    delete sendQueues[userId];
+                    delete lastSentAt[userId];
                 }
             }
         }
@@ -299,6 +341,11 @@ async function createSession(userId) {
                 if (msg.message && msg.key?.id) {
                     msgStore.set(msg.key.id, msg.message);
                 }
+                continue;
+            }
+
+            if (isDuplicateIncoming(userId, msg.key?.id)) {
+                console.log(`Mensagem recebida duplicada ignorada user=${userId} id=${msg.key?.id}`);
                 continue;
             }
 
@@ -399,6 +446,9 @@ app.post('/disconnect', authMiddleware, async (req, res) => {
         delete sessions[userId];
         delete reconnectAttempts[userId];
         delete messageStores[userId];
+        delete incomingMessageIds[userId];
+        delete sendQueues[userId];
+        delete lastSentAt[userId];
         clearSessionFiles(userId);
 
         await notifyDjango({
@@ -449,62 +499,77 @@ app.post('/send', authMiddleware, async (req, res) => {
         return res.status(400).json({ success: false, error: 'Parâmetros incompletos' });
     }
 
-    const session = sessions[userId];
-    if (!session || session.status !== 'conectado' || !session.sock) {
-        return res.status(400).json({ success: false, error: 'WhatsApp não conectado' });
-    }
-
     try {
-        const candidates = await resolveTargetJid(session.sock, phone, jid);
-        if (!candidates.length) {
-            return res.status(400).json({
-                success: false,
-                error: 'Não foi possível resolver o destinatário da mensagem',
-            });
-        }
-
-        // Digitando: mínimo 3s para ficar visível; máx 25s (mensagens longas)
-        const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 25);
-        const typingMs = showTyping
-            ? Math.max(requestedDelay, 3) * 1000
-            : requestedDelay * 1000;
-
-        const chatJid = jid && String(jid).includes('@') ? String(jid).trim() : null;
-        const typingTargets = [...new Set([chatJid, ...candidates].filter(Boolean))];
-
-        if (showTyping) {
-            await runTypingIndicator(session.sock, typingTargets, typingMs);
-        } else if (typingMs > 0) {
-            await sleep(typingMs);
-        }
-
-        let lastError = null;
-
-        for (const targetJid of candidates) {
-            try {
-                const sent = await session.sock.sendMessage(targetJid, {
-                    text: String(message),
-                });
-                const messageId = sent?.key?.id;
-                if (!messageId) {
-                    throw new Error('WhatsApp não confirmou o envio da mensagem');
-                }
-
-                rememberOutgoingMessage(userId, sent);
-                console.log(
-                    `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${typingMs}ms typing=${!!showTyping}`
-                );
-                return res.json({ success: true, jid: targetJid, messageId });
-            } catch (err) {
-                lastError = err;
-                console.warn(`Falha ao enviar para ${targetJid}: ${err.message}`);
+        const result = await enqueueSend(userId, async () => {
+            const session = sessions[userId];
+            if (!session || session.status !== 'conectado' || !session.sock) {
+                const error = new Error('WhatsApp não conectado');
+                error.statusCode = 400;
+                throw error;
             }
-        }
 
-        throw lastError || new Error('Falha ao enviar mensagem');
+            const candidates = await resolveTargetJid(session.sock, phone, jid);
+            if (!candidates.length) {
+                const error = new Error('Não foi possível resolver o destinatário da mensagem');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            // Mesmo com várias requisições concorrentes, mantém intervalo entre envios.
+            const minGapMs = 2500 + Math.floor(Math.random() * 2500);
+            const elapsed = Date.now() - (lastSentAt[userId] || 0);
+            if (elapsed < minGapMs) {
+                await sleep(minGapMs - elapsed);
+            }
+
+            // Digitando: mínimo 3s para ficar visível; máx 25s (mensagens longas)
+            const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 25);
+            const typingMs = showTyping
+                ? Math.max(requestedDelay, 3) * 1000
+                : requestedDelay * 1000;
+
+            const chatJid = jid && String(jid).includes('@') ? String(jid).trim() : null;
+            const typingTargets = [...new Set([chatJid, ...candidates].filter(Boolean))];
+
+            if (showTyping) {
+                await runTypingIndicator(session.sock, typingTargets, typingMs);
+            } else if (typingMs > 0) {
+                await sleep(typingMs);
+            }
+
+            let lastError = null;
+
+            for (const targetJid of candidates) {
+                try {
+                    const sent = await session.sock.sendMessage(targetJid, {
+                        text: String(message),
+                    });
+                    const messageId = sent?.key?.id;
+                    if (!messageId) {
+                        throw new Error('WhatsApp não confirmou o envio da mensagem');
+                    }
+
+                    rememberOutgoingMessage(userId, sent);
+                    lastSentAt[userId] = Date.now();
+                    console.log(
+                        `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${typingMs}ms typing=${!!showTyping}`
+                    );
+                    return { success: true, jid: targetJid, messageId };
+                } catch (err) {
+                    lastError = err;
+                    console.warn(`Falha ao enviar para ${targetJid}: ${err.message}`);
+                }
+            }
+
+            throw lastError || new Error('Falha ao enviar mensagem');
+        });
+
+        return res.json(result);
     } catch (err) {
         console.error('Erro ao enviar:', err);
-        res.status(500).json({ success: false, error: err.message || String(err) });
+        res
+            .status(err.statusCode || 500)
+            .json({ success: false, error: err.message || String(err) });
     }
 });
 

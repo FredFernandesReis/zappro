@@ -4,6 +4,7 @@ Lógica de processamento de mensagens recebidas e envio de autorespostas.
 
 import logging
 import random
+import re
 import unicodedata
 from datetime import timedelta
 
@@ -52,15 +53,68 @@ class MessageHandler:
         return config.hora_inicial <= agora <= config.hora_final
 
     def _buscar_resposta_palavra_chave(self, texto):
-        """Busca resposta automática pela palavra-chave."""
+        """Busca resposta por palavra-chave ou alias separado por ``|``."""
         texto_norm = _normalizar(texto)
         respostas = AutoResposta.objects.filter(user=self.user, status="ativa")
 
         for resposta in respostas:
-            chave = _normalizar(resposta.palavra_chave)
-            if chave and chave in texto_norm:
-                return resposta.resposta
+            aliases = re.split(r"[|;,]+", resposta.palavra_chave)
+            for alias in aliases:
+                chave = _normalizar(alias)
+                if not chave:
+                    continue
+                # Evita falsos positivos: alias "1" não dispara dentro de telefone,
+                # e "preço" não dispara dentro de outra palavra.
+                plural = "" if chave.endswith("s") or chave.isdigit() else "s?"
+                padrao = rf"(?<!\w){re.escape(chave)}{plural}(?!\w)"
+                if re.search(padrao, texto_norm):
+                    return resposta.resposta
         return None
+
+    def _pode_enviar_autoresposta(self, telefone, resposta_texto):
+        """
+        Impede rajadas e repetições para o mesmo contato.
+
+        Isso reduz respostas duplicadas quando o cliente envia várias mensagens
+        seguidas, sem bloquear conversas normais depois do intervalo.
+        """
+        agora = timezone.now()
+        enviadas = Mensagem.objects.filter(
+            user=self.user,
+            direcao="enviada",
+            telefone_destino=telefone,
+        )
+
+        cooldown = max(
+            int(getattr(settings, "AUTORESPOSTA_COOLDOWN_CONTATO_SEGUNDOS", 15)),
+            0,
+        )
+        ultima = enviadas.first()
+        if ultima and cooldown:
+            decorrido = (agora - ultima.criado_em).total_seconds()
+            if decorrido < cooldown:
+                return False, f"cooldown de {cooldown}s"
+
+        repetida_minutos = max(
+            int(getattr(settings, "AUTORESPOSTA_REPETIDA_INTERVALO_MINUTOS", 5)),
+            0,
+        )
+        if repetida_minutos and enviadas.filter(
+            conteudo=resposta_texto,
+            criado_em__gte=agora - timedelta(minutes=repetida_minutos),
+        ).exists():
+            return False, f"resposta repetida em {repetida_minutos}min"
+
+        max_hora = max(
+            int(getattr(settings, "AUTORESPOSTA_MAX_POR_CONTATO_HORA", 10)),
+            0,
+        )
+        if max_hora and enviadas.filter(
+            criado_em__gte=agora - timedelta(hours=1)
+        ).count() >= max_hora:
+            return False, f"limite de {max_hora} respostas/hora"
+
+        return True, ""
 
     def _precisa_boas_vindas(self, telefone):
         """
@@ -159,6 +213,18 @@ class MessageHandler:
                 tipo_resposta = "boas_vindas"
 
         if resposta_texto:
+            pode_enviar, motivo = self._pode_enviar_autoresposta(
+                telefone, resposta_texto
+            )
+            if not pode_enviar:
+                logger.info(
+                    "Autoresposta ignorada para %s (user %s): %s",
+                    telefone,
+                    self.user.id,
+                    motivo,
+                )
+                return None
+
             delay = self._delay_humano(resposta_texto)
             show_typing = getattr(settings, "AUTORESPOSTA_MOSTRAR_DIGITANDO", True)
 

@@ -16,7 +16,7 @@ class AutoRespostaForm(forms.ModelForm):
         widgets = {
             "palavra_chave": forms.TextInput(attrs={
                 "class": "form-control",
-                "placeholder": "Ex: preço, horário, suporte",
+                "placeholder": "Ex: 1 | preço",
             }),
             "resposta": forms.Textarea(attrs={
                 "class": "form-control",
@@ -24,6 +24,12 @@ class AutoRespostaForm(forms.ModelForm):
                 "placeholder": "Texto da resposta automática",
             }),
             "status": forms.Select(attrs={"class": "form-select"}),
+        }
+        help_texts = {
+            "palavra_chave": (
+                "Use | para aceitar mais de uma opção. "
+                "Ex.: 1 | preço responde tanto “1” quanto “preço”."
+            ),
         }
 
 

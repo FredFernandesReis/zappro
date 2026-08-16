@@ -22,20 +22,25 @@ Regras de qualidade:
 - Português brasileiro natural, leve e claro (como no zap: "opa", "pode ser", "fechou").
 - Evite: "prezado", "estamos à disposição", "não hesite", "neste momento", menu enorme.
 - Cada resposta: 1 a 3 frases curtas. Pode usar 1 emoji no máximo (opcional).
-- Palavra-chave: 1-2 palavras que o cliente DIGITARIA (ex: preço, horário, endereço, agendar, cardápio, delivery).
+- Cada resposta deve aceitar número + palavra, separados por " | ".
+  Exemplo: "1 | preço", "2 | horário", "3 | agendar".
 - Crie 5 a 8 respostas úteis com base na descrição (preço, horário, endereço, agendar, pagamento, etc.).
 - Se o usuário informou preço/horário/endereço, USE esses dados. Se não informou, diga que confirma no chat — não invente.
 - Foque em conversão simples: responder a dúvida e convidar a continuar o assunto.
 - Inclua EXATAMENTE 3 boas-vindas DIFERENTES (mesmo sentido, textos bem distintos: abertura, tom e fecho diferentes).
-- Boas-vindas: cumprimente, diga o que o negócio faz em 1 frase e indique 2-3 coisas que a pessoa pode digitar (ex: preço, horário).
+- Boas-vindas: cumprimente e mostre um menu leve com 3 opções usando este estilo:
+  "Escolha uma opção:\n▪️ 1 — Preços\n▪️ 2 — Horários\n▪️ 3 — Agendar\n\nResponda com o número ou o nome."
+- As 3 opções do menu precisam corresponder aos aliases numéricos das respostas.
+- Não finja que são botões; são opções rápidas por texto, compatíveis com qualquer WhatsApp.
 
 Formato exato:
 {
   "resumo": "frase curta do que entendeu",
   "boas_vindas": ["variação 1", "variação 2", "variação 3"],
   "respostas": [
-    {"palavra_chave": "preço", "resposta": "texto curto e humano"},
-    {"palavra_chave": "horário", "resposta": "texto curto e humano"}
+    {"palavra_chave": "1 | preço", "resposta": "texto curto e humano"},
+    {"palavra_chave": "2 | horário", "resposta": "texto curto e humano"},
+    {"palavra_chave": "3 | agendar", "resposta": "texto curto e humano"}
   ]
 }
 """
