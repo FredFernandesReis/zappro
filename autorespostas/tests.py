@@ -1,13 +1,14 @@
 from datetime import timedelta
 from decimal import Decimal
-
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from subscriptions.models import Plan, Subscription
 
+from .forms import BoasVindasForm
 from .models import AutoResposta, ConfiguracaoBoasVindas
 
 
@@ -51,3 +52,33 @@ class ModelosProntosTests(TestCase):
         self.client.post(url, {"modelo": "loja"})
 
         self.assertEqual(AutoResposta.objects.filter(user=self.user).count(), 5)
+
+
+class BoasVindasAudioTests(TestCase):
+    def test_form_aceita_somente_audio(self):
+        audio = SimpleUploadedFile(
+            "welcome.webm",
+            b"RIFF" + b"\x00" * 64,
+            content_type="audio/webm",
+        )
+        form = BoasVindasForm(
+            data={
+                "ativo": "on",
+                "mensagem": "",
+                "mensagem_2": "",
+                "mensagem_3": "",
+            },
+            files={"audio": audio},
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_form_rejeita_ativo_sem_texto_e_sem_audio(self):
+        form = BoasVindasForm(
+            data={
+                "ativo": "on",
+                "mensagem": "",
+                "mensagem_2": "",
+                "mensagem_3": "",
+            }
+        )
+        self.assertFalse(form.is_valid())

@@ -86,6 +86,25 @@ class BoasVindasForm(forms.ModelForm):
             raise forms.ValidationError("O áudio deve ter no máximo 2 MB.")
         return audio
 
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("ativo"):
+            return cleaned
+
+        textos = [
+            (cleaned.get("mensagem") or "").strip(),
+            (cleaned.get("mensagem_2") or "").strip(),
+            (cleaned.get("mensagem_3") or "").strip(),
+        ]
+        audio_novo = cleaned.get("audio")
+        remover = cleaned.get("remover_audio")
+        audio_atual = bool(self.instance and getattr(self.instance, "audio", None) and not remover)
+        if not any(textos) and not audio_novo and not audio_atual:
+            raise forms.ValidationError(
+                "Para ativar as boas-vindas, grave um áudio ou escreva pelo menos uma mensagem."
+            )
+        return cleaned
+
     def save(self, commit=True):
         instance = super().save(commit=False)
         if self.cleaned_data.get("remover_audio") and instance.audio:

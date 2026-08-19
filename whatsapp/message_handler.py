@@ -189,7 +189,10 @@ class MessageHandler:
         mensagem = config.escolher_mensagem()
         audio_path = ""
         if config.audio:
-            audio_path = getattr(config.audio, "path", "") or ""
+            try:
+                audio_path = config.audio.path
+            except (ValueError, FileNotFoundError):
+                audio_path = ""
         if not mensagem and not audio_path:
             return False, None, None
         return True, mensagem or "", audio_path

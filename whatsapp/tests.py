@@ -3,11 +3,12 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from autorespostas.models import AutoResposta
+from autorespostas.models import AutoResposta, ConfiguracaoBoasVindas
 from subscriptions.models import Plan, Subscription
 
 from .message_handler import MessageHandler
@@ -134,6 +135,62 @@ class MessageHandlerProtectionTests(TestCase):
 
         self.assertFalse(permitido)
         self.assertIn("repetida", motivo)
+
+
+class WelcomeAudioOnlyTests(TestCase):
+    def setUp(self):
+        plan = Plan.objects.create(
+            nome="Mensal",
+            slug="basico",
+            max_respostas=0,
+            permite_horario=True,
+            permite_boas_vindas=True,
+            preco_mensal=Decimal("29.90"),
+            ativo=True,
+        )
+        self.user = User.objects.create_user("soaudio", password="teste123")
+        Subscription.objects.update_or_create(
+            user=self.user,
+            defaults={
+                "plan": plan,
+                "status": "ativo",
+                "data_vencimento": timezone.localdate() + timedelta(days=30),
+            },
+        )
+        self.config = ConfiguracaoBoasVindas.objects.create(
+            user=self.user,
+            ativo=True,
+            mensagem="",
+            mensagem_2="",
+            mensagem_3="",
+        )
+        self.config.audio.save(
+            "welcome.webm",
+            SimpleUploadedFile("welcome.webm", b"\x00" * 80, content_type="audio/webm"),
+            save=True,
+        )
+        self.config.refresh_from_db()
+        self.user = User.objects.select_related("config_boas_vindas").get(pk=self.user.pk)
+        self.handler = MessageHandler(self.user)
+        self.assertTrue(self.user.config_boas_vindas.tem_conteudo())
+
+    def test_envia_apenas_audio_quando_nao_ha_texto(self):
+        precisa, texto, audio = self.handler._precisa_boas_vindas("5531988887777")
+        self.assertTrue(precisa)
+        self.assertEqual(texto, "")
+        self.assertTrue(audio)
+
+        with patch.object(
+            self.handler.whatsapp_service,
+            "send_message",
+            return_value={"success": True, "messageId": "abc123"},
+        ) as mock_send:
+            enviada = self.handler.process_incoming_message("5531988887777", "oi")
+
+        self.assertEqual(enviada, "[audio]")
+        self.assertEqual(mock_send.call_count, 1)
+        self.assertTrue(mock_send.call_args.kwargs.get("audio_path"))
+        self.assertEqual(mock_send.call_args.args[2], "")
 
 
 class ConnectionAlertTests(TestCase):

@@ -46,7 +46,8 @@ class ConfiguracaoBoasVindas(models.Model):
     ativo = models.BooleanField("Ativo", default=False)
     mensagem = models.TextField(
         "Mensagem 1",
-        default="Olá! Seja bem-vindo.\nDigite:\n1 - Vendas\n2 - Suporte\n3 - Financeiro",
+        blank=True,
+        default="",
     )
     mensagem_2 = models.TextField("Mensagem 2", blank=True, default="")
     mensagem_3 = models.TextField("Mensagem 3", blank=True, default="")
