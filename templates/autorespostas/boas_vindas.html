@@ -12,8 +12,9 @@
                 <p class="text-muted">
                     Cadastre até <strong>3 textos</strong> em rodízio e, se quiser, um
                     <strong>áudio leve</strong> (até 2 MB) enviado no primeiro contato.
+                    Você pode gravar agora no navegador.
                 </p>
-                <form method="post" enctype="multipart/form-data">
+                <form method="post" enctype="multipart/form-data" id="boasVindasForm">
                     {% csrf_token %}
                     <div class="form-check form-switch mb-3">
                         {{ form.ativo }}
@@ -32,16 +33,36 @@
                         {{ form.mensagem_3 }}
                     </div>
                     <div class="mb-3">
-                        <label class="form-label" for="{{ form.audio.id_for_label }}">
+                        <label class="form-label">
                             <i class="bi bi-mic"></i> Áudio de boas-vindas
                         </label>
+
+                        <div class="audio-recorder mb-3" id="audioRecorder">
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                                <button type="button" class="btn btn-whatsapp" id="recStart">
+                                    <i class="bi bi-mic-fill"></i> Gravar agora
+                                </button>
+                                <button type="button" class="btn btn-danger d-none" id="recStop">
+                                    <i class="bi bi-stop-fill"></i> Parar
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary d-none" id="recDiscard">
+                                    Descartar gravação
+                                </button>
+                                <span class="text-muted small" id="recStatus">Máx. 40 segundos · use o microfone do celular ou do PC</span>
+                            </div>
+                            <audio class="w-100 mt-3 d-none" id="recPreview" controls></audio>
+                            <div class="text-danger small mt-2 d-none" id="recError"></div>
+                        </div>
+
+                        <label class="form-label small text-muted" for="id_audio">Ou envie um arquivo pronto</label>
                         {{ form.audio }}
                         {% if form.audio.errors %}<div class="text-danger small">{{ form.audio.errors.0 }}</div>{% endif %}
                         <div class="form-text">
-                            Opcional. Formatos: ogg, mp3, m4a. O WhatsApp recebe como áudio (não precisa ser pesado).
+                            Formatos: ogg, mp3, m4a, webm. Até 2 MB.
                         </div>
                         {% if form.instance.audio %}
-                        <audio class="mt-2 w-100" controls src="{% url 'autorespostas:boas_vindas_audio' %}"></audio>
+                        <p class="small fw-semibold mt-3 mb-1">Áudio salvo hoje:</p>
+                        <audio class="w-100" controls src="{% url 'autorespostas:boas_vindas_audio' %}"></audio>
                         <div class="form-check mt-2">
                             {{ form.remover_audio }}
                             <label class="form-check-label" for="{{ form.remover_audio.id_for_label }}">
@@ -59,4 +80,139 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const startBtn = document.getElementById('recStart');
+    const stopBtn = document.getElementById('recStop');
+    const discardBtn = document.getElementById('recDiscard');
+    const statusEl = document.getElementById('recStatus');
+    const preview = document.getElementById('recPreview');
+    const errorEl = document.getElementById('recError');
+    const fileInput = document.getElementById('id_audio');
+    const removeBox = document.getElementById('id_remover_audio');
+    if (!startBtn || !fileInput) return;
+
+    const maxSeconds = 40;
+    let mediaRecorder = null;
+    let chunks = [];
+    let timer = null;
+    let startedAt = 0;
+    let previewUrl = '';
+
+    function pickMime() {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4',
+        ];
+        if (!window.MediaRecorder) return '';
+        for (let i = 0; i < types.length; i += 1) {
+            if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+        }
+        return '';
+    }
+
+    function showError(message) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('d-none');
+    }
+
+    function clearError() {
+        errorEl.textContent = '';
+        errorEl.classList.add('d-none');
+    }
+
+    function setFile(blob, mime) {
+        const ext = mime.indexOf('mp4') >= 0 ? 'm4a' : (mime.indexOf('ogg') >= 0 ? 'ogg' : 'webm');
+        const file = new File([blob], 'welcome.' + ext, { type: mime || blob.type || 'audio/webm' });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        if (removeBox) removeBox.checked = false;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(blob);
+        preview.src = previewUrl;
+        preview.classList.remove('d-none');
+        discardBtn.classList.remove('d-none');
+        statusEl.textContent = 'Gravação pronta. Clique em Salvar para usar no WhatsApp.';
+    }
+
+    function stopTimer() {
+        if (timer) {
+            window.clearInterval(timer);
+            timer = null;
+        }
+    }
+
+    startBtn.addEventListener('click', function () {
+        clearError();
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError('Este navegador não permite gravar. Use Chrome ou Safari no celular.');
+            return;
+        }
+        const mime = pickMime();
+        navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+            chunks = [];
+            const options = mime ? { mimeType: mime, audioBitsPerSecond: 24000 } : { audioBitsPerSecond: 24000 };
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (err) {
+                mediaRecorder = new MediaRecorder(stream);
+            }
+            mediaRecorder.ondataavailable = function (event) {
+                if (event.data && event.data.size) chunks.push(event.data);
+            };
+            mediaRecorder.onstop = function () {
+                stream.getTracks().forEach(function (track) { track.stop(); });
+                stopTimer();
+                startBtn.classList.remove('d-none');
+                stopBtn.classList.add('d-none');
+                const usedMime = mediaRecorder.mimeType || mime || 'audio/webm';
+                const blob = new Blob(chunks, { type: usedMime });
+                if (!blob.size) {
+                    showError('Não deu para gravar o áudio. Permita o microfone e tente de novo.');
+                    return;
+                }
+                if (blob.size > 2 * 1024 * 1024) {
+                    showError('O áudio ficou acima de 2 MB. Grave um recado mais curto.');
+                    return;
+                }
+                setFile(blob, usedMime);
+            };
+            mediaRecorder.start();
+            startedAt = Date.now();
+            startBtn.classList.add('d-none');
+            stopBtn.classList.remove('d-none');
+            statusEl.textContent = 'Gravando… 0s';
+            timer = window.setInterval(function () {
+                const seconds = Math.floor((Date.now() - startedAt) / 1000);
+                statusEl.textContent = 'Gravando… ' + seconds + 's';
+                if (seconds >= maxSeconds && mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            }, 250);
+        }).catch(function () {
+            showError('Precisamos da permissão do microfone. Autorize e clique em Gravar agora.');
+        });
+    });
+
+    stopBtn.addEventListener('click', function () {
+        if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+    });
+
+    discardBtn.addEventListener('click', function () {
+        fileInput.value = '';
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = '';
+        preview.removeAttribute('src');
+        preview.classList.add('d-none');
+        discardBtn.classList.add('d-none');
+        statusEl.textContent = 'Máx. 40 segundos · use o microfone do celular ou do PC';
+    });
+}());
+</script>
 {% endblock %}

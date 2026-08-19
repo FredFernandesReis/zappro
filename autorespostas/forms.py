@@ -67,6 +67,7 @@ class BoasVindasForm(forms.ModelForm):
             }),
             "audio": forms.ClearableFileInput(attrs={
                 "class": "form-control",
+                "id": "id_audio",
                 "accept": "audio/ogg,audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/webm,.ogg,.mp3,.m4a,.opus,.aac,.wav,.webm",
             }),
         }
