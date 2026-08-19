@@ -63,18 +63,30 @@ class WhatsAppService:
         """Obtém status da conexão."""
         return self._request("GET", f"/status/{user_id}", timeout=5)
 
-    def send_message(self, user_id, phone, message, jid=None, delay_seconds=0, show_typing=False):
-        """Envia mensagem via WhatsApp."""
+    def send_message(
+        self,
+        user_id,
+        phone,
+        message,
+        jid=None,
+        delay_seconds=0,
+        show_typing=False,
+        audio_path="",
+    ):
+        """Envia texto e, opcionalmente, áudio leve via WhatsApp."""
         delay = max(int(delay_seconds or 0), 0)
         payload = {
             "userId": user_id,
             "phone": phone,
-            "message": message,
+            "message": message or "",
             "delaySeconds": delay,
             "showTyping": bool(show_typing),
         }
         if jid:
             payload["jid"] = jid
+        if audio_path:
+            payload["audioPath"] = audio_path
+            payload["audioPtt"] = True
         # digitando mínimo ~3s no Node + margem de rede
         timeout = max(45, delay + 35)
         return self._request("POST", "/send", payload, timeout=timeout)

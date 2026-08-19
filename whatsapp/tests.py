@@ -59,6 +59,45 @@ class MessageHandlerProtectionTests(TestCase):
             self.handler._buscar_resposta_palavra_chave("Meu telefone é 31999999999")
         )
 
+    def test_prefers_longer_keyword_over_number_one(self):
+        AutoResposta.objects.create(
+            user=self.user,
+            palavra_chave="1 | preço",
+            resposta="Tabela de preços",
+        )
+        AutoResposta.objects.create(
+            user=self.user,
+            palavra_chave="11 | combo",
+            resposta="Combo promocional",
+        )
+
+        self.assertEqual(
+            self.handler._buscar_resposta_palavra_chave("11"),
+            "Combo promocional",
+        )
+        self.assertEqual(
+            self.handler._buscar_resposta_palavra_chave("preço??"),
+            "Tabela de preços",
+        )
+
+    @override_settings(AUTORESPOSTA_COOLDOWN_CONTATO_SEGUNDOS=15)
+    def test_allows_keyword_right_after_welcome(self):
+        Mensagem.objects.create(
+            user=self.user,
+            direcao="enviada",
+            conteudo="Olá! Digite 1 para preços.",
+            telefone_destino="5531999999999",
+            tipo_resposta="boas_vindas",
+        )
+
+        permitido, motivo = self.handler._pode_enviar_autoresposta(
+            "5531999999999",
+            "O corte custa R$ 45.",
+            tipo_resposta="palavra_chave",
+        )
+
+        self.assertTrue(permitido, motivo)
+
     @override_settings(AUTORESPOSTA_COOLDOWN_CONTATO_SEGUNDOS=15)
     def test_blocks_burst_for_same_contact(self):
         Mensagem.objects.create(

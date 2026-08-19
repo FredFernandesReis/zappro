@@ -16,7 +16,7 @@ class AutoRespostaAdmin(admin.ModelAdmin):
 
 @admin.register(ConfiguracaoBoasVindas)
 class ConfiguracaoBoasVindasAdmin(admin.ModelAdmin):
-    list_display = ("user", "ativo", "ultima_variacao", "atualizado_em")
+    list_display = ("user", "ativo", "ultima_variacao", "audio", "atualizado_em")
 
 
 @admin.register(ConfiguracaoHorario)

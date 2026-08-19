@@ -3,7 +3,13 @@ Models de respostas automáticas, boas-vindas e horário de atendimento.
 """
 
 from django.contrib.auth.models import User
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+
+def _audio_boas_vindas_path(instance, filename):
+    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "ogg").lower()[:8]
+    return f"boas_vindas/{instance.user_id}/welcome.{ext}"
 
 
 class AutoResposta(models.Model):
@@ -44,6 +50,18 @@ class ConfiguracaoBoasVindas(models.Model):
     )
     mensagem_2 = models.TextField("Mensagem 2", blank=True, default="")
     mensagem_3 = models.TextField("Mensagem 3", blank=True, default="")
+    audio = models.FileField(
+        "Áudio de boas-vindas",
+        upload_to=_audio_boas_vindas_path,
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=["ogg", "opus", "mp3", "m4a", "aac", "wav", "webm"]
+            )
+        ],
+        help_text="Opcional. Até 2 MB. Enviado como áudio no WhatsApp.",
+    )
     ultima_variacao = models.PositiveSmallIntegerField(
         "Última variação enviada", default=0
     )
@@ -64,6 +82,9 @@ class ConfiguracaoBoasVindas(models.Model):
             if limpo:
                 msgs.append(limpo)
         return msgs
+
+    def tem_conteudo(self):
+        return bool(self.mensagens_ativas() or self.audio)
 
     def escolher_mensagem(self):
         """

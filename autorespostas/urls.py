@@ -19,6 +19,7 @@ urlpatterns = [
     path("<int:pk>/editar/", views.edit_view, name="edit"),
     path("<int:pk>/excluir/", views.delete_view, name="delete"),
     path("boas-vindas/", views.boas_vindas_view, name="boas_vindas"),
+    path("boas-vindas/audio/", views.boas_vindas_audio_view, name="boas_vindas_audio"),
     path("horario/", views.horario_view, name="horario"),
     # Página removida — redireciona links antigos para a lista de respostas
     path(

@@ -121,9 +121,8 @@ def _normalize_suggestions(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _call_groq(prompt: str) -> str:
+def _call_groq_model(prompt: str, model: str) -> str:
     api_key = getattr(settings, "GROQ_API_KEY", "")
-    model = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -158,7 +157,7 @@ def _call_groq(prompt: str) -> str:
         ) from exc
 
     if resp.status_code >= 400:
-        logger.error("Groq error %s: %s", resp.status_code, resp.text[:800])
+        logger.error("Groq error %s (%s): %s", resp.status_code, model, resp.text[:800])
         detail = ""
         try:
             detail = str(resp.json().get("error", {}).get("message") or "")
@@ -179,6 +178,27 @@ def _call_groq(prompt: str) -> str:
         return body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError) as exc:
         raise RuntimeError("Resposta inesperada da IA") from exc
+
+
+def _call_groq(prompt: str) -> str:
+    primary = getattr(settings, "GROQ_MODEL", "llama-3.3-70b-versatile")
+    fallback = getattr(settings, "GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")
+    models = [primary]
+    if fallback and fallback != primary:
+        models.append(fallback)
+
+    last_error: Exception | None = None
+    for model in models:
+        try:
+            return _call_groq_model(prompt, model)
+        except RuntimeError as exc:
+            last_error = exc
+            message = str(exc).lower()
+            if "limite" in message or "demorou" in message or "inesperada" in message:
+                logger.warning("Groq modelo %s falhou (%s); tentando fallback.", model, exc)
+                continue
+            raise
+    raise last_error or RuntimeError("Falha ao consultar a IA.")
 
 
 def generate_autorespostas(descricao: str) -> dict[str, Any]:

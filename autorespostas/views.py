@@ -7,7 +7,7 @@ import json
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.safestring import mark_safe
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -221,7 +221,7 @@ def boas_vindas_view(request):
         return redirect("subscriptions:plans")
 
     if request.method == "POST":
-        form = BoasVindasForm(request.POST, instance=config)
+        form = BoasVindasForm(request.POST, request.FILES, instance=config)
         if form.is_valid():
             form.save()
             messages.success(request, "Configuração de boas-vindas salva!")
@@ -230,6 +230,15 @@ def boas_vindas_view(request):
         form = BoasVindasForm(instance=config)
 
     return render(request, "autorespostas/boas_vindas.html", {"form": form})
+
+
+@login_required
+def boas_vindas_audio_view(request):
+    """Entrega o áudio de boas-vindas do próprio usuário (preview no painel)."""
+    config = ConfiguracaoBoasVindas.objects.filter(user=request.user).first()
+    if not config or not config.audio:
+        raise Http404("Áudio não encontrado.")
+    return FileResponse(config.audio.open("rb"), as_attachment=False)
 
 
 @login_required

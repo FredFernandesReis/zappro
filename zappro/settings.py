@@ -201,3 +201,4 @@ CAKTO_EMBED_IFRAME = os.environ.get("CAKTO_EMBED_IFRAME", "1") not in ("0", "fal
 # Assistente de IA (Groq — cota gratuita) https://console.groq.com
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_FALLBACK_MODEL = os.environ.get("GROQ_FALLBACK_MODEL", "llama-3.1-8b-instant")

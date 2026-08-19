@@ -16,8 +16,20 @@
 
 {% if not ai_ok %}
 <div class="alert alert-warning">
-    A IA ainda não está configurada no servidor. Peça ao administrador para adicionar
-    <code>GROQ_API_KEY</code> no <code>.env</code>.
+    A IA ainda não está configurada no servidor.
+    Crie uma chave grátis em
+    <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a>
+    e coloque no <code>.env</code> da VPS:
+    <pre class="mb-0 mt-2 small">GROQ_API_KEY=gsk_sua_chave
+GROQ_MODEL=llama-3.3-70b-versatile</pre>
+    Depois rode <code>systemctl restart zappro</code>.
+    A Groq é a melhor opção gratuita deste sistema para <strong>criar</strong> as respostas.
+    Ela não conversa ao vivo com o cliente no WhatsApp — isso evita bloqueio e respostas inventadas.
+</div>
+{% else %}
+<div class="alert alert-light border">
+    A IA do ZapPro (Groq) monta o menu e as palavras-chave. Quem responde o cliente no WhatsApp
+    são as respostas cadastradas, de forma estável e sem custo por mensagem.
 </div>
 {% endif %}
 

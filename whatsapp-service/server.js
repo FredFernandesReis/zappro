@@ -173,10 +173,31 @@ async function resolveTargetJid(sock, phone, jid) {
     return [...new Set(candidates.filter(Boolean))];
 }
 
-/** Mantém "digitando..." visível durante o atraso. */
-async function runTypingIndicator(sock, jids, durationMs) {
+function audioMimetypeFromPath(filePath) {
+    const ext = path.extname(String(filePath || '')).toLowerCase();
+    const map = {
+        '.ogg': 'audio/ogg; codecs=opus',
+        '.opus': 'audio/ogg; codecs=opus',
+        '.mp3': 'audio/mpeg',
+        '.m4a': 'audio/mp4',
+        '.aac': 'audio/aac',
+        '.wav': 'audio/wav',
+        '.webm': 'audio/webm',
+    };
+    return map[ext] || 'audio/ogg; codecs=opus';
+}
+
+function isSafeAudioPath(filePath) {
+    const resolved = path.resolve(String(filePath || ''));
+    const mediaRoot = path.resolve(path.join(__dirname, '..', 'media'));
+    return resolved === mediaRoot || resolved.startsWith(mediaRoot + path.sep);
+}
+
+/** Mantém "digitando..." ou "gravando áudio..." visível durante o atraso. */
+async function runTypingIndicator(sock, jids, durationMs, presence = 'composing') {
     const targets = [...new Set((jids || []).filter(Boolean))];
     if (!targets.length || durationMs <= 0) return;
+    const state = presence === 'recording' ? 'recording' : 'composing';
 
     try {
         await sock.sendPresenceUpdate('available');
@@ -188,15 +209,15 @@ async function runTypingIndicator(sock, jids, durationMs) {
         for (const target of targets) {
             try {
                 await sock.presenceSubscribe(target);
-                await sock.sendPresenceUpdate('composing', target);
+                await sock.sendPresenceUpdate(state, target);
             } catch (err) {
-                console.warn(`digitando falhou em ${target}: ${err.message}`);
+                console.warn(`presença falhou em ${target}: ${err.message}`);
             }
         }
     };
 
     await composing();
-    console.log(`Digitando ${durationMs}ms -> ${targets.join(', ')}`);
+    console.log(`${state} ${durationMs}ms -> ${targets.join(', ')}`);
 
     const started = Date.now();
     while (Date.now() - started < durationMs) {
@@ -493,9 +514,13 @@ app.post('/send', authMiddleware, async (req, res) => {
         message,
         delaySeconds = 0,
         showTyping = false,
+        audioPath = '',
+        audioPtt = false,
     } = req.body;
 
-    if (!userId || !message || (!phone && !jid)) {
+    const hasText = Boolean(message);
+    const hasAudio = Boolean(audioPath);
+    if (!userId || (!hasText && !hasAudio) || (!phone && !jid)) {
         return res.status(400).json({ success: false, error: 'Parâmetros incompletos' });
     }
 
@@ -515,6 +540,29 @@ app.post('/send', authMiddleware, async (req, res) => {
                 throw error;
             }
 
+            let audioBuffer = null;
+            let audioMimetype = '';
+            if (hasAudio) {
+                if (!isSafeAudioPath(audioPath)) {
+                    const error = new Error('Caminho de áudio inválido');
+                    error.statusCode = 400;
+                    throw error;
+                }
+                const resolvedAudio = path.resolve(String(audioPath));
+                if (!fs.existsSync(resolvedAudio)) {
+                    const error = new Error('Arquivo de áudio não encontrado');
+                    error.statusCode = 400;
+                    throw error;
+                }
+                audioBuffer = fs.readFileSync(resolvedAudio);
+                if (audioBuffer.length > 2.5 * 1024 * 1024) {
+                    const error = new Error('Áudio acima de 2 MB');
+                    error.statusCode = 400;
+                    throw error;
+                }
+                audioMimetype = audioMimetypeFromPath(resolvedAudio);
+            }
+
             // Mesmo com várias requisições concorrentes, mantém intervalo entre envios.
             const minGapMs = 2500 + Math.floor(Math.random() * 2500);
             const elapsed = Date.now() - (lastSentAt[userId] || 0);
@@ -522,28 +570,39 @@ app.post('/send', authMiddleware, async (req, res) => {
                 await sleep(minGapMs - elapsed);
             }
 
-            // Digitando: mínimo 3s para ficar visível; máx 25s (mensagens longas)
+            // Digitando / gravando: mínimo 3s para ficar visível; máx 25s
             const requestedDelay = Math.min(Math.max(Number(delaySeconds) || 0, 0), 25);
-            const typingMs = showTyping
-                ? Math.max(requestedDelay, 3) * 1000
+            const typingMs = showTyping || hasAudio
+                ? Math.max(requestedDelay, hasAudio ? 2 : 3) * 1000
                 : requestedDelay * 1000;
 
             const chatJid = jid && String(jid).includes('@') ? String(jid).trim() : null;
             const typingTargets = [...new Set([chatJid, ...candidates].filter(Boolean))];
 
-            if (showTyping) {
-                await runTypingIndicator(session.sock, typingTargets, typingMs);
+            if (showTyping || hasAudio) {
+                await runTypingIndicator(
+                    session.sock,
+                    typingTargets,
+                    typingMs,
+                    hasAudio ? 'recording' : 'composing'
+                );
             } else if (typingMs > 0) {
                 await sleep(typingMs);
             }
+
+            const content = audioBuffer
+                ? {
+                    audio: audioBuffer,
+                    mimetype: audioMimetype,
+                    ptt: Boolean(audioPtt),
+                }
+                : { text: String(message) };
 
             let lastError = null;
 
             for (const targetJid of candidates) {
                 try {
-                    const sent = await session.sock.sendMessage(targetJid, {
-                        text: String(message),
-                    });
+                    const sent = await session.sock.sendMessage(targetJid, content);
                     const messageId = sent?.key?.id;
                     if (!messageId) {
                         throw new Error('WhatsApp não confirmou o envio da mensagem');
@@ -552,7 +611,7 @@ app.post('/send', authMiddleware, async (req, res) => {
                     rememberOutgoingMessage(userId, sent);
                     lastSentAt[userId] = Date.now();
                     console.log(
-                        `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${typingMs}ms typing=${!!showTyping}`
+                        `OK envio user=${userId} jid=${targetJid} id=${messageId} delay=${typingMs}ms typing=${!!showTyping} audio=${!!audioBuffer}`
                     );
                     return { success: true, jid: targetJid, messageId };
                 } catch (err) {
